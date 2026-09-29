@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<title>Sedan 1940 · Terrain</title>
+<style>
+:root{--ink:#F2F4F2;--muted:#A9B1AD;--bg:#101418;--sheet:rgb(16 20 24 / .86);--line:rgb(255 255 255 / .16);--us:#6FA0FF;--us-bg:#15233A;--de:#FF6B5E;--de-bg:#3A1714;--air:#FFC23A;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:rgb(255 255 255 / .08);border-radius:10px;min-height:42px;padding:0 14px}
+button.primary{background:var(--us);border-color:var(--us);color:#fff;font-weight:700}
+video{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#1a2026}
+#labels{position:fixed;inset:0;pointer-events:none}
+.lab{position:absolute;left:0;top:0;pointer-events:auto;display:flex;align-items:center;gap:6px;background:var(--sheet);border:1px solid var(--line);border-radius:10px;padding:5px 9px 5px 6px;font-size:14px;font-weight:650;white-space:nowrap;transform-origin:0 0;will-change:transform}
+.lab small{display:block;font-size:11px;font-weight:500;color:var(--muted)}
+.lab.U,.lab.B{border-color:var(--us)} .lab.C{border-color:var(--de)} .lab.P{border-color:var(--air)}
+.lab .tail{position:absolute;left:50%;top:100%;width:1.5px;background:var(--ink);opacity:.5}
+.lab.q{border-style:dashed}
+.edge{position:fixed;top:45%;padding:8px 10px;background:var(--sheet);border-radius:10px;font-size:13px;font-weight:700;pointer-events:none}
+#edgeL{left:6px} #edgeR{right:6px}
+.top{position:fixed;left:0;right:0;top:0;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:linear-gradient(rgb(16 20 24 / .9),rgb(16 20 24 / 0))}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#cap{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+#gps{font-size:12px;color:var(--muted)}
+#evt{margin-top:6px;font-size:14px;line-height:1.35;background:var(--sheet);border-left:3px solid var(--air);border-radius:0 8px 8px 0;padding:6px 10px}
+.bot{position:fixed;left:0;right:0;bottom:0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:var(--sheet);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+#cranlab{font-weight:800;font-size:15px}
+input[type=range]{width:100%;accent-color:var(--us)}
+select{background:rgb(255 255 255 / .08);border:1px solid var(--line);border-radius:10px;min-height:42px;padding:0 8px}
+select option{background:#1b2126}
+.tools{display:flex;gap:6px}
+.tools>*{flex:1}
+.panel{position:fixed;left:0;right:0;bottom:0;max-height:78dvh;overflow:auto;background:#161c21;border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));z-index:20;box-shadow:0 -20px 60px #0008}
+.panel[hidden],[hidden]{display:none!important}
+.panel h2{margin:4px 0 6px;font-size:21px}
+.panel p{line-height:1.5;margin:8px 0;font-size:15px}
+.meta{font-size:13px;color:var(--muted)}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;margin-right:6px;background:rgb(255 255 255 / .1)}
+.badge.S{background:#1E5B3A}.badge.R{background:#5B4A1E}.badge.q{background:#5B1E1E}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#mapc{width:100%;height:min(52dvh,420px);background:#1B2126;border-radius:12px;display:block;touch-action:none}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:14px;margin:12px 0}
+#start{position:fixed;inset:0;z-index:40;background:var(--bg);overflow:auto;padding:calc(28px + env(safe-area-inset-top)) 22px 28px;display:flex;flex-direction:column;gap:14px}
+#start h1{font-size:30px;margin:0;line-height:1.1}
+#start p{line-height:1.55;margin:0;color:var(--muted)}
+#start .btns{flex-direction:column}
+#start button{min-height:52px;font-size:16px}
+#toast{position:fixed;left:50%;top:40%;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:10px;z-index:50;font-weight:600;max-width:88vw;text-align:center}
+</style>
+</head>
+<body>
+<video id="cam" playsinline muted autoplay></video>
+<div id="labels"></div>
+<div class="edge" id="edgeL" hidden></div><div class="edge" id="edgeR" hidden></div>
+
+<div class="top">
+  <div class="row"><span id="cap">—</span><span id="gps">Position en attente</span></div>
+  <div id="evt"></div>
+</div>
+
+<div class="bot">
+  <div class="row"><span id="cranlab"></span></div>
+  <input id="cran" type="range" min="0" max="7" step="1" value="0" aria-label="Date">
+  <div class="tools">
+    <select id="radius" aria-label="Rayon d'affichage"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="20">20 km</option><option value="50">50 km</option><option value="120">120 km</option></select>
+    <button id="mapbtn">Carte</button>
+    <button id="setbtn">Réglages</button>
+  </div>
+</div>
+
+<section class="panel" id="fiche" hidden>
+  <div class="meta" id="fwhen"></div>
+  <h2 id="ftitle"></h2>
+  <div id="fbadges"></div>
+  <p id="ftext"></p>
+  <p class="meta" id="fgeo"></p>
+  <div class="btns"><button id="fspeak">Écouter</button><button id="frecal">Je vise ce repère : recaler</button><button id="fclose" class="primary">Fermer</button></div>
+</section>
+
+<section class="panel" id="mappanel" hidden>
+  <h2>Carte</h2>
+  <p class="meta" id="maphint">Nord en haut. Le cône indique ta direction de visée.</p>
+  <canvas id="mapc"></canvas>
+  <label class="f" id="simhead" hidden>Direction simulée <input id="simh" type="range" min="0" max="359" value="200"></label>
+  <div class="btns"><button id="mapclose" class="primary">Fermer</button></div>
+</section>
+
+<section class="panel" id="setpanel" hidden>
+  <h2>Réglages</h2>
+  <label class="f">Champ de vision de la caméra : <b id="fovv"></b><input id="fov" type="range" min="30" max="90" value="50"></label>
+  <p class="meta">Si les repères glissent plus vite que le paysage quand tu tournes, augmente la valeur ; s'ils glissent moins vite, diminue-la.</p>
+  <label class="f">Correction de boussole : <b id="offv"></b><input id="off" type="range" min="-45" max="45" value="0"></label>
+  <p class="meta">Méthode la plus sûre : vise un repère visible (clocher, château), ouvre sa fiche et touche « recaler ». Avant chaque station, calibre la boussole en décrivant des huit avec le téléphone.</p>
+  <div class="btns"><button id="offreset">Remettre la correction à zéro</button><button id="setclose" class="primary">Fermer</button></div>
+  <p class="meta">Positions d'unités indicatives, reconstituées d'après : Wikipédia (Percée de Sedan, Plan Dyle, 1re Panzerdivision, Bodange, Herbeumont, Cugnon), atf40.fr (5e DLC), Axis History Forum, Lexikon der Wehrmacht. À confronter à K.-H. Frieser et J.-Y. Mary. Légende : S sourcé, R reconstitué, ? à confirmer.</p>
+</section>
+
+<section id="start">
+  <h1>Sedan 1940<br>sur le terrain</h1>
+  <p>Du 9 au 12 mai 1940, de la frontière luxembourgeoise à la Meuse. Tiens le téléphone à la verticale : les unités, les franchissements et les localités apparaissent dans leur direction réelle, avec leur distance.</p>
+  <p>Autorise la caméra, la position et les capteurs de mouvement. Calibre la boussole en décrivant des huit avec le téléphone.</p>
+  <div class="btns">
+    <button class="primary" id="gofield">Sur le terrain</button>
+    <button id="gosim">Simulation (sans GPS : choisir sa position sur la carte)</button>
+  </div>
+  <p class="meta" id="startmsg"></p>
+</section>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const CRANS=['9 mai · matin','9 mai · soir','10 mai · matin','10 mai · soir','11 mai · matin','11 mai · soir','12 mai · matin','12 mai · soir'];
+const FIAB={S:'Sourcé',R:'Reconstitué',q:'À confirmer'};
+
+/* ===== Événements par demi-journée ===== */
+const EVT=[
+ ['Veille de l’offensive : le XIX corps de Guderian (1re, 2e, 10e Panzer) est rassemblé dans l’Eifel, face au Luxembourg.','R'],
+ ['Nuit du 9 au 10 : les colonnes serrent sur les points de passage de Wallendorf, Vianden et Echternach.','R'],
+ ['10 mai, 4 h 35 : les trois Panzerdivisions franchissent la frontière luxembourgeoise. La cavalerie française entre en Belgique.','S'],
+ ['10 mai : à Bodange, une cinquantaine de chasseurs ardennais arrêtent la 1re Panzer jusqu’après 18 h. Au nord d’Arlon, la 10e Panzer repousse la 2e DLC derrière la Semois.','S'],
+ ['11 mai : la 5e DLC affronte les trois Panzerdivisions. La 1re prend Neufchâteau, la 2e attaque Libramont, la 10e surgit au sud de Neufchâteau.','S'],
+ ['11 mai au soir : la cavalerie repasse la Semois ; le pont de Bouillon saute. Kleist ordonne de réorienter la 10e Panzer vers Longwy. Nuit : tête de pont allemande à Mouzaive.','S'],
+ ['12 mai : Bouillon tombe au matin. La Semois est franchie à Vresse (2e Pz) et entre Cugnon et Herbeumont (10e Pz). Guderian installe son PC à l’hôtel Panorama.','S'],
+ ['12 mai au soir : les restes de la 5e DLC repassent la Meuse, les ponts sautent, les Allemands entrent dans Sedan. Franchissement fixé au 13 mai, 16 h.','S']];
+
+/* ===== Repères fixes : [nom, lat, lon, type, du cran, au cran, fiabilité, texte] ===== */
+const PTS=[
+ ['Wallendorf-Pont',49.874,6.285,'Passage de frontière',1,2,'S','Point de passage de la 1re Panzerdivision vers le Luxembourg, le 10 mai à l’aube.'],
+ ['Vianden',49.935,6.208,'Passage de frontière',1,2,'S','Point de passage de la 2e Panzerdivision.'],
+ ['Echternach',49.812,6.418,'Passage de frontière',1,2,'S','Point de passage de la 10e Panzerdivision.'],
+ ['Martelange',49.832,5.739,'Point d’appui belge',0,3,'S','Point d’appui tenu par la 4e compagnie du 1er régiment de chasseurs ardennais ; contact vers 7 h le 10 mai.'],
+ ['Bodange',49.855,5.693,'Combat',2,3,'S','Le 10 mai, deux pelotons de chasseurs ardennais (capitaine Bricart), privés de l’ordre de repli, tiennent le village face aux motocyclistes puis à deux bataillons de la 1re Panzer. Ils déposent les armes après 18 h, laissant 9 tués dont leur capitaine.'],
+ ['Neufchâteau',49.841,5.435,'Objectif',3,4,'S','Objectif de la 1re Panzer dès le 10 mai ; pris le 11.'],
+ ['Libramont',49.920,5.379,'Combat',3,4,'S','Attaquée par la 2e Panzer le 11 mai ; tenue par des éléments de la 5e DLC.'],
+ ['Bouillon, pont',49.794,5.066,'Pont détruit',5,6,'S','Le pont saute alors que les derniers cavaliers repassent la Semois. La rivière, peu profonde, se franchit à gué.'],
+ ['Hôtel Panorama',49.7947,5.0722,'PC de Guderian',6,7,'S','PC du XIX corps le 12 mai. Un raid britannique frappe tout près une colonne du génie. Hypothèse : le bâtiment actuel occupe le même emplacement.'],
+ ['Mouzaive',49.855,4.965,'Tête de pont',5,6,'S','Nuit du 11 au 12 : les Allemands suivent le repli de la 3e brigade de spahis et franchissent la Semois à 6 h. Les sources attribuent l’action à la 1re Panzer, bien que le village soit dans le secteur de la 2e.'],
+ ['Vresse-sur-Semois',49.871,4.930,'Franchissement',6,6,'S','Franchissement de la Semois par la 2e Panzer le 12 mai.'],
+ ['Herbeumont',49.782,5.237,'Franchissement',6,6,'S','Pris dans les premières heures du 12 mai par la 10e Panzer.'],
+ ['Cugnon',49.803,5.210,'Franchissement',6,6,'S','Pris le 12 mai par la 10e Panzer.'],
+ ['Florenville',49.700,5.308,'Débouché',2,2,'S','Axe de débouché de la 5e DLC au-delà de la Semois le 10 mai.'],
+ ['Ponts de Sedan',49.702,4.940,'Ponts détruits',7,7,'S','Les ponts sautent le 12 mai au soir après le passage de la cavalerie.'],
+ ['Glaire',49.717,4.922,'Futur franchissement',7,7,'R','Boucle de la Meuse où franchiront le 13 mai le 1er régiment de fusiliers et Grossdeutschland.'],
+ ['Bazeilles',49.677,4.980,'Arrivée',7,7,'S','La 10e Panzer atteint la Meuse au sud-est de Sedan le 12 au soir.'],
+ ['Frénois · Marfée',49.675,4.930,'Secteur français',0,7,'S','Sous-secteur de Frénois de la 55e DI, sur la rive sud, dominé par les bois de la Marfée.'],
+ ['Villers-sur-Bar',49.668,4.866,'Secteur français',0,7,'q','Sous-secteur ouest de la 55e DI (coordonnées à confirmer).'],
+ ['Angecourt',49.636,5.001,'Secteur français',0,7,'q','Sous-secteur est de la 55e DI (coordonnées à confirmer).'],
+ ['Sedan',49.702,4.940,'Localité',0,6,'S','Ville bâtie sur la rive nord de la Meuse.'],
+ ['Donchery',49.696,4.873,'Localité',0,7,'S',''],
+ ['Wadelincourt',49.688,4.947,'Localité',0,7,'S','Rive sud, face à Sedan.']];
+
+/* ===== Unités : 8 positions [lat, lon, fiabilité, commentaire] ou null ===== */
+const UN=[
+ {id:'pz1',s:'C',k:'arm',e:'XX',n:'1 Pz',full:'1. Panzer-Division',chef:'Generalleutnant Friedrich Kirchner',pos:[
+  [49.90,6.40,'R','Rassemblement dans l’Eifel.'],[49.874,6.29,'R','Aux abords de Wallendorf.'],[49.847,6.098,'R','Traversée du Luxembourg par Ettelbruck.'],
+  [49.855,5.693,'S','Arrêtée à Bodange par les chasseurs ardennais ; les chars restent pris dans les encombrements.'],[49.841,5.435,'S','Prend Neufchâteau.'],
+  [49.813,5.084,'R','Devant Bouillon, au nord de la Semois.'],[49.794,5.066,'S','Prend Bouillon au matin et franchit la Semois.'],[49.715,4.935,'R','Premiers éléments à Sedan, rive nord.']]},
+ {id:'pz2',s:'C',k:'arm',e:'XX',n:'2 Pz',full:'2. Panzer-Division',chef:'Generalleutnant Rudolf Veiel',pos:[
+  [49.98,6.30,'R','Rassemblement dans l’Eifel.'],[49.935,6.21,'R','Aux abords de Vianden.'],[49.966,5.932,'R','Traversée du nord du Luxembourg.'],
+  [49.93,5.75,'q','Franchit la frontière belge (position à confirmer).'],[49.920,5.379,'S','Attaque Libramont.'],
+  [49.903,5.135,'R','Progresse vers la Semois.'],[49.871,4.930,'S','Franchit la Semois à Vresse.'],[49.815,4.905,'R','En retard : n’atteindra la Meuse à Donchery qu’après les deux autres divisions.']]},
+ {id:'pz10',s:'C',k:'arm',e:'XX',n:'10 Pz + GD',full:'10. Panzer-Division et régiment Grossdeutschland',chef:'Generalleutnant Ferdinand Schaal',pos:[
+  [49.83,6.55,'R','Rassemblement dans l’Eifel.'],[49.812,6.42,'R','Aux abords d’Echternach.'],[49.75,6.05,'R','Traversée du sud du Luxembourg.'],
+  [49.70,5.70,'S','Au contact de la 2e DLC au nord d’Arlon, qu’elle repousse derrière la Semois.'],[49.80,5.42,'S','Grand détour vers le nord-ouest : surgit au sud de Neufchâteau.'],
+  [49.80,5.27,'R','Approche la Semois vers Herbeumont.'],[49.782,5.237,'S','Franchit la Semois entre Cugnon et Herbeumont.'],[49.677,4.980,'S','Atteint la Meuse au sud-est de Sedan, vers Bazeilles.']]},
+ {id:'ca',s:'B',k:'inf',e:'III',n:'Chasseurs ardennais',full:'1er régiment de chasseurs ardennais (armée belge)',chef:'',pos:[
+  [49.845,5.715,'S','Points d’appui de Martelange et Bodange, face à la frontière.'],[49.845,5.715,'S','Idem.'],[49.845,5.715,'S','Retardent l’avant-garde allemande.'],
+  null,null,null,null,null]},
+ {id:'dlc5',s:'U',k:'cav',e:'XX',n:'5 DLC',full:'5e division légère de cavalerie',chef:'Général Chanoine',pos:[
+  [49.66,4.95,'q','En France, au sud de la Meuse (position à confirmer).'],[49.66,4.95,'q','Idem.'],[49.75,5.19,'R','Débouche au-delà de la Semois par Bouillon et Florenville.'],
+  [49.88,5.41,'S','Atteint la ligne Neufchâteau – Libramont.'],[49.88,5.41,'S','Aux prises avec les trois Panzerdivisions.'],
+  [49.790,5.065,'S','Défend Bouillon, rive sud de la Semois, avec deux compagnies du 295e RI.'],[49.75,5.00,'R','Repli vers la Meuse, pris de flanc après la perte de Mouzaive.'],[49.66,4.93,'S','Vers 17 h, les restes de la division repassent la Meuse.']]},
+ {id:'bs3',s:'U',k:'cav',e:'X',n:'3 BS',full:'3e brigade de spahis',chef:'Colonel Olivier Marc',pos:[
+  [49.70,4.80,'q','En France (position à confirmer).'],[49.70,4.80,'q','Idem.'],[49.903,5.135,'R','Couvre l’ouest de la 5e DLC.'],
+  [49.903,5.135,'R','Idem.'],[49.903,5.135,'R','Idem.'],[49.855,4.965,'S','Évacue Mouzaive ; les Allemands la suivent.'],[49.78,4.90,'R','Repli vers la Meuse.'],[49.72,4.83,'R','Derrière la Meuse.']]},
+ {id:'dlc2',s:'U',k:'cav',e:'XX',n:'2 DLC',full:'2e division légère de cavalerie',chef:'Général Berniquet',pos:[
+  [49.55,5.45,'q','En France (position à confirmer).'],[49.55,5.45,'q','Idem.'],[49.70,5.80,'S','Au contact de la 10e Panzer au nord d’Arlon, dès midi.'],
+  [49.685,5.52,'S','Repliée derrière la Semois en soirée.'],null,null,null,null]},
+ {id:'di55',s:'U',k:'inf',e:'XX',n:'55 DI',full:'55e division d’infanterie (série B)',chef:'Général Lafontaine',pos:Array(8).fill([49.675,4.930,'S','Rive sud de la Meuse, sous-secteurs de Villers-sur-Bar, Frénois et Angecourt.'])},
+ {id:'di71',s:'U',k:'inf',e:'XX',n:'3 DINA / 71 DI',full:'3e DINA, relevée par la 71e DI dans la nuit du 11 au 12',chef:'',pos:[
+  [49.63,5.05,'R','3e DINA, à l’est de la 55e DI.'],[49.63,5.05,'R','Idem.'],[49.63,5.05,'R','Idem.'],[49.63,5.05,'R','Idem.'],[49.63,5.05,'R','Idem.'],
+  [49.63,5.05,'S','Nuit du 11 au 12 : la 71e DI relève péniblement la 3e DINA.'],[49.63,5.05,'R','71e DI, qui connaît mal le terrain.'],[49.63,5.05,'R','Idem.']]}];
+
+/* ===== Rivières (tracés de l'atelier, projection x=(lon-3,85)×720 ; y=(49,95-lat)×1110) ===== */
+const RIV=['M905,430 C895,400 885,385 882,381 C875,355 868,338 862,330 C845,312 820,296 800,288 C790,284 782,283 776,281 C768,277 764,262 758,250 C752,242 744,245 742,256 C741,268 740,278 734,284 C722,290 706,288 690,282 C672,272 655,262 645,240 C638,222 628,212 618,206 C610,196 622,182 632,160 C640,135 634,100 636,73 C638,40 640,0 642,-60',
+ 'M1060,285 C1040,260 1010,238 980,222 C950,205 910,180 877,176 C850,168 830,150 800,125 C770,108 730,98 700,90 C675,84 650,78 636,73',
+ 'M1000,362 C975,358 950,353 925,345 C900,338 880,332 862,330'].map(d=>new Path2D(d));
+const PX=(lat,lon)=>[(lon-3.85)*720,(49.95-lat)*1110];
+const UNPX=(x,y)=>[49.95-y/1110,x/720+3.85];
+
+/* ===== Géodésie ===== */
+const R=6371,rad=Math.PI/180;
+function dist(a,b,c,d){const x=Math.sin((c-a)*rad/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin((d-b)*rad/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function bear(a,b,c,d){const y=Math.sin((d-b)*rad)*Math.cos(c*rad),x=Math.cos(a*rad)*Math.sin(c*rad)-Math.sin(a*rad)*Math.cos(c*rad)*Math.cos((d-b)*rad);return (Math.atan2(y,x)/rad+360)%360;}
+const norm=a=>((a+540)%360)-180;
+const CARD=['N','NE','E','SE','S','SO','O','NO'];
+
+/* ===== État ===== */
+let me=null,acc=null,rawHead=null,head=null,sim=false,cran=+(localStorage.getItem('t40cran')||0);
+let fov=+(localStorage.getItem('t40fov')||50),off=+(localStorage.getItem('t40off')||0),radius=10,items=[],sel=null;
+try{$('radius').value=localStorage.getItem('t40rad')||'10';}catch(e){}
+radius=+$('radius').value;
+function toast(t){const e=$('toast');e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,3500);}
+function save(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+
+/* ===== Symboles ===== */
+function sym(s,k,small){
+ const c=s==='C'?'var(--de)':'var(--us)',f=s==='C'?'var(--de-bg)':'var(--us-bg)';
+ let fr=s==='C'?`<path d="M13,1 L25,9 L13,17 L1,9Z" fill="${f}" stroke="${c}" stroke-width="1.6"/>`:`<rect x="1.5" y="2" width="23" height="14" fill="${f}" stroke="${c}" stroke-width="1.6"/>`;
+ let ic='';
+ if(k==='inf')ic=s==='C'?`<path d="M8,4 L18,14 M8,14 L18,4" stroke="${c}" stroke-width="1.3"/>`:`<path d="M1.5,2 L24.5,16 M1.5,16 L24.5,2" stroke="${c}" stroke-width="1.3"/>`;
+ if(k==='cav')ic=s==='C'?`<path d="M8,14 L18,4" stroke="${c}" stroke-width="1.3"/>`:`<path d="M1.5,16 L24.5,2" stroke="${c}" stroke-width="1.3"/>`;
+ if(k==='arm')ic=`<ellipse cx="13" cy="9" rx="7" ry="4" fill="none" stroke="${c}" stroke-width="1.3"/>`;
+ return `<svg width="26" height="18" viewBox="0 0 26 18" aria-hidden="true">${fr}${ic}</svg>`;
+}
+const PIN='<svg width="14" height="18" viewBox="0 0 14 18" aria-hidden="true"><path d="M7,17 C3,11 1,9 1,6 A6,6 0 0 1 13,6 C13,9 11,11 7,17Z" fill="var(--air)"/></svg>';
+
+/* ===== Construction des éléments visibles au cran courant ===== */
+function build(){
+ items=[];
+ PTS.forEach(p=>{if(cran>=p[4]&&cran<=p[5])items.push({kind:'P',name:p[0],lat:p[1],lon:p[2],type:p[3],f:p[6],txt:p[7]});});
+ UN.forEach(u=>{const q=u.pos[cran];if(q)items.push({kind:u.s,name:u.n,lat:q[0],lon:q[1],type:u.full,f:q[2],txt:q[3],chef:u.chef,k:u.k});});
+ const box=$('labels');box.replaceChildren();
+ items.forEach(it=>{
+  const d=document.createElement('div');d.className='lab '+it.kind+(it.f!=='S'?' q':'');
+  d.innerHTML=(it.kind==='P'?PIN:sym(it.kind,it.k))+'<div><span></span><small></small></div><i class="tail"></i>';
+  d.querySelector('span').textContent=it.name;
+  d.onclick=()=>openFiche(it);
+  it.el=d;it.small=d.querySelector('small');it.tail=d.querySelector('.tail');d.style.display='none';box.appendChild(d);
+ });
+ $('cranlab').textContent=CRANS[cran];
+ $('evt').textContent=EVT[cran][0]+(EVT[cran][1]==='R'?' (reconstitué)':'');
+ if(!$('mappanel').hidden)drawMap();
+}
+
+/* ===== Boussole ===== */
+function compass(e){
+ let h=null;
+ if(typeof e.webkitCompassHeading==='number')h=e.webkitCompassHeading;
+ else if(e.alpha!==null&&(e.absolute||e.type==='deviceorientationabsolute')){
+  const a=e.alpha*rad,b=(e.beta||0)*rad,g=(e.gamma||0)*rad;
+  const cA=Math.cos(a),sA=Math.sin(a),cB=Math.cos(b),sB=Math.sin(b),cG=Math.cos(g),sG=Math.sin(g);
+  const vx=-cA*sG-sA*sB*cG,vy=-sA*sG+cA*sB*cG;   /* direction de l'axe arrière (caméra), projetée à l'horizontale */
+  h=Math.hypot(vx,vy)<.25?(360-e.alpha)%360:(Math.atan2(vx,vy)/rad+360)%360;
+ }
+ if(h===null)return;
+ rawHead=rawHead===null?h:(rawHead+norm(h-rawHead)*.2+360)%360;
+}
+let gotAbs=false;
+addEventListener('deviceorientationabsolute',e=>{gotAbs=true;compass(e);});
+addEventListener('deviceorientation',e=>{if(!gotAbs)compass(e);});
+
+/* ===== Démarrage ===== */
+async function startField(){
+ $('startmsg').textContent='Demande des autorisations…';
+ try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission)await DeviceOrientationEvent.requestPermission();}catch(e){}
+ try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});$('cam').srcObject=s;}
+ catch(e){toast('Caméra indisponible : les repères s’affichent sur fond neutre.');}
+ if(!navigator.geolocation){toast('GPS indisponible : passe en simulation.');}
+ else navigator.geolocation.watchPosition(p=>{me=[p.coords.latitude,p.coords.longitude];acc=p.coords.accuracy;},
+  e=>{$('gps').textContent='GPS : '+(e.code===1?'refusé':'indisponible');},{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+ $('start').hidden=true;
+ setTimeout(()=>{if(rawHead===null){$('simhead').hidden=false;toast('Aucune boussole détectée : la direction se règle dans Carte.');}},4000);
+}
+function startSim(){
+ sim=true;me=[49.690,4.930];$('start').hidden=true;$('simhead').hidden=false;
+ $('maphint').textContent='Touche la carte pour te placer. Règle ta direction avec le curseur.';
+ openMap();
+}
+$('gofield').onclick=startField;$('gosim').onclick=startSim;
+
+/* ===== Boucle d'affichage ===== */
+function frame(){
+ requestAnimationFrame(frame);
+ if(sim||rawHead===null){if(sim||!$('simhead').hidden)rawHead=+$('simh').value;}
+ head=rawHead===null?null:(rawHead+off+360)%360;
+ $('cap').textContent=head===null?'Cap —':`Cap ${Math.round(head)}° ${CARD[Math.round(head/45)%8]}`;
+ $('gps').textContent=sim?'Simulation':me?`GPS ±${Math.round(acc)} m`:'Position en attente';
+ const W=innerWidth,H=innerHeight;let nl=0,nr=0;const placed=[];
+ items.forEach(it=>{it.el.style.display='none';});
+ if(!me||head===null)return;
+ const vis=[];
+ items.forEach(it=>{
+  it.d=dist(me[0],me[1],it.lat,it.lon);it.b=bear(me[0],me[1],it.lat,it.lon);
+  if(it.d>radius)return;
+  const rel=norm(it.b-head);
+  if(Math.abs(rel)>fov/2){rel<0?nl++:nr++;return;}
+  it.x=W/2+rel/(fov/2)*(W/2);it.y=H*.64-Math.min(1,it.d/radius)*H*.34;vis.push(it);
+ });
+ vis.sort((a,b)=>a.d-b.d).forEach(it=>{
+  it.el.style.display='';
+  it.small.textContent=(it.d<1?Math.round(it.d*1000)+' m':it.d.toFixed(it.d<10?1:0)+' km')+' · '+Math.round(it.b)+'°';
+  const w=it.el.offsetWidth,h=it.el.offsetHeight;let x=Math.max(4,Math.min(W-w-4,it.x-w/2)),y=it.y-h;
+  for(let k=0;k<12;k++){const hit=placed.find(p=>x<p[0]+p[2]+4&&x+w+4>p[0]&&y<p[1]+p[3]+4&&y+h+4>p[1]);if(!hit)break;y=hit[1]-h-6;}
+  y=Math.max(110,y);placed.push([x,y,w,h]);
+  it.el.style.transform=`translate(${x}px,${y}px)`;
+  it.tail.style.height=Math.max(0,it.y-y-h)+'px';
+ });
+ $('edgeL').hidden=!nl;$('edgeL').textContent='◀ '+nl;$('edgeR').hidden=!nr;$('edgeR').textContent=nr+' ▶';
+}
+requestAnimationFrame(frame);
+
+/* ===== Fiche ===== */
+function openFiche(it){
+ sel=it;$('fwhen').textContent=CRANS[cran]+' · '+it.type;$('ftitle').textContent=it.name;
+ $('fbadges').innerHTML=`<span class="badge ${it.f==='?'||it.f==='q'?'q':it.f}">${FIAB[it.f]||it.f}</span>`;
+ $('ftext').textContent=(it.txt||'')+(it.chef?' Chef : '+it.chef+'.':'');
+ $('fgeo').textContent=me?`À ${it.d.toFixed(1)} km, direction ${Math.round(it.b)}°.`:'';
+ $('fiche').hidden=false;
+}
+$('fclose').onclick=()=>{$('fiche').hidden=true;speechSynthesis&&speechSynthesis.cancel();};
+$('fspeak').onclick=()=>{if(!window.speechSynthesis||!sel)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(sel.name+'. '+$('ftext').textContent);u.lang='fr-FR';speechSynthesis.speak(u);};
+$('frecal').onclick=()=>{
+ if(!sel||!me||rawHead===null){toast('Position ou boussole indisponible.');return;}
+ off=Math.round(norm(sel.b-rawHead));$('off').value=Math.max(-45,Math.min(45,off));off=+$('off').value;save('t40off',off);upSet();
+ toast(`Boussole recalée sur ${sel.name} (${off>0?'+':''}${off}°).`);$('fiche').hidden=true;
+};
+
+/* ===== Carte ===== */
+const mc=$('mapc'),mx=mc.getContext('2d');let mview=null;
+function openMap(){$('mappanel').hidden=false;requestAnimationFrame(drawMap);}
+function drawMap(){
+ const r=mc.getBoundingClientRect(),dpr=devicePixelRatio||1;mc.width=r.width*dpr;mc.height=r.height*dpr;
+ const c=me||[49.75,5.2],[cx,cy]=PX(c[0],c[1]),span=Math.max(radius,5)*10*2.3,s=Math.min(mc.width,mc.height)/span;
+ mview={cx,cy,s,w:mc.width,h:mc.height};
+ mx.setTransform(1,0,0,1,0,0);mx.fillStyle='#1B2126';mx.fillRect(0,0,mc.width,mc.height);
+ mx.setTransform(s,0,0,s,mc.width/2-cx*s,mc.height/2-cy*s);
+ mx.strokeStyle='#3D6178';mx.lineWidth=2.5/s;RIV.forEach(p=>mx.stroke(p));
+ const T=(x,y)=>[mc.width/2+(x-cx)*s,mc.height/2+(y-cy)*s];
+ mx.setTransform(1,0,0,1,0,0);
+ const [ox,oy]=T(cx,cy);mx.strokeStyle='rgb(255 255 255 / .25)';mx.setLineDash([6,5]);mx.beginPath();mx.arc(ox,oy,radius*10*s,0,7);mx.stroke();mx.setLineDash([]);
+ mx.font=`${12*dpr}px system-ui`;
+ items.forEach(it=>{const [x,y]=T(...PX(it.lat,it.lon));
+  mx.fillStyle=it.kind==='C'?'#FF6B5E':it.kind==='P'?'#FFC23A':'#6FA0FF';
+  if(it.kind==='C'){mx.beginPath();mx.moveTo(x,y-7*dpr);mx.lineTo(x+7*dpr,y);mx.lineTo(x,y+7*dpr);mx.lineTo(x-7*dpr,y);mx.fill();}
+  else if(it.kind==='P'){mx.beginPath();mx.arc(x,y,4*dpr,0,7);mx.fill();}
+  else mx.fillRect(x-7*dpr,y-5*dpr,14*dpr,10*dpr);
+  mx.fillStyle='#F2F4F2';mx.fillText(it.name,x+9*dpr,y+4*dpr);});
+ if(me){if(head!==null){mx.fillStyle='rgb(255 194 58 / .25)';mx.beginPath();mx.moveTo(ox,oy);
+   mx.arc(ox,oy,90*dpr,(head-fov/2-90)*rad,(head+fov/2-90)*rad);mx.closePath();mx.fill();}
+  mx.fillStyle='#fff';mx.beginPath();mx.arc(ox,oy,6*dpr,0,7);mx.fill();mx.strokeStyle='#1F5FD6';mx.lineWidth=3*dpr;mx.stroke();}
+}
+mc.addEventListener('pointerdown',e=>{
+ if(!sim||!mview)return;const r=mc.getBoundingClientRect(),dpr=devicePixelRatio||1;
+ const x=mview.cx+((e.clientX-r.left)*dpr-mview.w/2)/mview.s,y=mview.cy+((e.clientY-r.top)*dpr-mview.h/2)/mview.s;
+ me=UNPX(x,y);drawMap();
+});
+$('mapbtn').onclick=openMap;$('mapclose').onclick=()=>$('mappanel').hidden=true;
+$('simh').oninput=()=>{rawHead=+$('simh').value;drawMap();};
+
+/* ===== Réglages ===== */
+function upSet(){$('fovv').textContent=fov+'°';$('offv').textContent=(off>0?'+':'')+off+'°';}
+$('fov').value=fov;$('off').value=off;upSet();
+$('fov').oninput=()=>{fov=+$('fov').value;save('t40fov',fov);upSet();};
+$('off').oninput=()=>{off=+$('off').value;save('t40off',off);upSet();};
+$('offreset').onclick=()=>{off=0;$('off').value=0;save('t40off',0);upSet();};
+$('setbtn').onclick=()=>$('setpanel').hidden=false;$('setclose').onclick=()=>$('setpanel').hidden=true;
+
+/* ===== Date et rayon ===== */
+$('cran').value=cran;
+$('cran').oninput=()=>{cran=+$('cran').value;save('t40cran',cran);$('fiche').hidden=true;build();};
+$('radius').onchange=()=>{radius=+$('radius').value;save('t40rad',radius);if(!$('mappanel').hidden)drawMap();};
+build();
+
+/* ===== Hors ligne ===== */
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+})();
+</script>
+</body>
+</html>
