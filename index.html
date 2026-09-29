@@ -164,7 +164,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
     </div>
     <p class="warn">Symboles et ordres de bataille repris des figuratifs de l'EDG-T. Positions indicatives, à recaler avec les fascicules (menu ☰). Du 9 au 12 mai, chaque position porte son niveau de fiabilité.</p>
     <button id="go">Activer caméra et boussole</button>
-    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 10 h 40</p>
+    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 11 h 45</p>
   </div>
 </div>
 
@@ -172,12 +172,12 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
   <canvas id="fmap"></canvas>
   <div id="fhead"><button id="fprev" aria-label="Phase précédente">◀</button><div id="fphase"></div><button id="fnext" aria-label="Phase suivante">▶</button></div>
   <div id="fattr">Fond © OpenTopoMap (CC-BY-SA) · © contributeurs OpenStreetMap · SRTM</div>
-  <div id="fbar"><button id="fzout" aria-label="Dézoomer">−</button><button id="fzin" aria-label="Zoomer">+</button><button id="fcenter" aria-pressed="true">Centrer</button><button id="fcap">Cap ↑</button><button id="ftopo" aria-pressed="true">Topo</button><button id="fclose">Caméra</button></div>
+  <div id="fbar"><button id="fzout" aria-label="Dézoomer">−</button><button id="fzin" aria-label="Zoomer">+</button><button id="fcenter" aria-pressed="true">Centrer</button><button id="fcap">Cap ↑</button><button id="ftopo">Topo actuelle</button><button id="fclose">Caméra</button></div>
 </div>
 
 <div id="sheet">
   <button id="closeSheet">Fermer</button>
-  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 10 h 40</p>
+  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 11 h 45</p>
   <h2>Ordre de bataille</h2>
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
@@ -186,7 +186,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
   <div class="row" style="margin-top:8px"><button id="navGo">Guider</button><button id="navStop">Arrêter le guidage</button></div>
   <p class="warn" style="color:var(--dim);margin:6px 0 0">En mode GPS, l'arrivée à moins de 40 m enchaîne sur la station suivante de la liste.</p>
   <h2>Carte hors ligne</h2>
-  <p class="warn" style="color:var(--dim);margin:0 0 6px">À faire avec du réseau, avant de partir : télécharge le fond topographique de Bouillon à Stonne (environ 500 tuiles, une à deux minutes) et le garde sur le téléphone.</p>
+  <p class="warn" style="color:var(--dim);margin:0 0 6px">À faire avec du réseau, avant de partir : télécharge le fond topographique de Bouillon à Stonne (topo actuelle et carte 1950, environ 1 000 tuiles, deux à quatre minutes) et le garde sur le téléphone.</p>
   <button id="prefetch" style="width:100%">Préparer la carte hors ligne</button>
   <p class="warn" id="prefTxt" style="color:var(--dim);margin:6px 0 0"></p>
   <h2>Réglages</h2>
@@ -930,13 +930,27 @@ relBtn(); setInterval(()=>{$("relTxt").textContent=RELIEF.msg;},500);
 
 // ---------- Carte à plat ----------
 const fc=$("fmap"), fx=fc.getContext("2d");
-const FM={z:load("eht_fz",12),capUp:load("eht_fcap",true),topo:load("eht_ftopo",true),follow:true,center:null,manual:false,shown:false,lowT:0,highT:0,suppress:false};
+const FM={z:load("eht_fz",12),capUp:load("eht_fcap",true),bg:load("eht_fbg","topo"),follow:true,center:null,manual:false,shown:false,lowT:0,highT:0,suppress:false};
 const TS=256, merc=(lat,lon,z)=>{const s=TS*Math.pow(2,z),φ=lat*rad;return{x:(lon+180)/360*s,y:(1-Math.log(Math.tan(φ)+1/Math.cos(φ))/Math.PI)/2*s};};
 const unmerc=(x,y,z)=>{const s=TS*Math.pow(2,z);return{lon:x/s*360-180,lat:Math.atan(Math.sinh(Math.PI*(1-2*y/s)))/rad};};
+// Fonds de carte. Cartes IGN (Géoplateforme, accès libre) : France seulement ; en Belgique, la topo actuelle reste dessous.
+const IGN=(layer,style,tms)=>(z,x,y)=>"https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER="+layer+"&STYLE="+style+"&TILEMATRIXSET="+tms+"&TILEMATRIX="+z+"&TILEROW="+y+"&TILECOL="+x+"&FORMAT=image/jpeg";
+const BG={
+  topo:{lab:"Topo actuelle",min:5,max:16,url:(z,x,y)=>"https://"+"abc"[(x+y)%3]+".tile.opentopomap.org/"+z+"/"+x+"/"+y+".png",attr:"Fond © OpenTopoMap (CC-BY-SA) · © contributeurs OpenStreetMap · SRTM"},
+  c1950:{lab:"Carte 1950",min:3,max:15,url:IGN("GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN50.1950","SCAN50_1950","PM_3_15"),attr:"Carte 1950 © IGN – SCAN 50® historique (France) · Belgique : © OpenTopoMap",under:"topo"},
+  em:{lab:"État-major",min:6,max:15,url:IGN("GEOGRAPHICALGRIDSYSTEMS.ETATMAJOR40","normal","PM_6_15"),attr:"Carte de l'état-major 1820-1866 © IGN (France) · Belgique : © OpenTopoMap",under:"topo"},
+  none:{lab:"Sans fond",attr:"Fond simplifié de l'atelier (hors ligne)"}};
+const BGORDER=["topo","c1950","em","none"];
 const tiles={}; let tileErr=0;
-function tile(z,x,y){ const n=1<<z; x=((x%n)+n)%n; if(y<0||y>=n) return null; const k=z+"/"+x+"/"+y;
-  if(!tiles[k]){ const im=new Image(); im.onerror=()=>{tileErr++;im.bad=true;}; im.src="https://"+"abc"[(x+y)%3]+".tile.opentopomap.org/"+k+".png"; tiles[k]=im; }
+function tile(id,z,x,y){ const n=1<<z; x=((x%n)+n)%n; if(y<0||y>=n) return null; const k=id+"/"+z+"/"+x+"/"+y;
+  if(!tiles[k]){ const im=new Image(); im.onerror=()=>{tileErr++;im.bad=true;}; im.src=BG[id].url(z,x,y); tiles[k]=im; }
   return tiles[k]; }
+function drawLayer(id,v){ const L=BG[id]; if(!L||!L.url) return 0; let n=0;
+  const tz=Math.max(L.min,Math.min(L.max,Math.round(FM.z))), k=Math.pow(2,FM.z-tz), sz=TS*k, R=Math.hypot(v.W,v.H)/2+sz;
+  const ctz=merc(FM.center.lat,FM.center.lon,tz); fx.save(); fx.translate(v.ox,v.oy); fx.rotate(v.rot);
+  const x0=Math.floor((ctz.x-R/k)/TS),x1=Math.floor((ctz.x+R/k)/TS),y0=Math.floor((ctz.y-R/k)/TS),y1=Math.floor((ctz.y+R/k)/TS);
+  for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){ const im=tile(id,tz,x,y); if(im&&im.complete&&!im.bad&&im.naturalWidth){ fx.drawImage(im,(x*TS-ctz.x)*k,(y*TS-ctz.y)*k,sz+0.5,sz+0.5); n++; } }
+  fx.restore(); return n; }
 function view(){ const dpr=window.devicePixelRatio||1, W=fc.clientWidth, H=fc.clientHeight;
   if(fc.width!==Math.round(W*dpr)||fc.height!==Math.round(H*dpr)){fc.width=W*dpr;fc.height=H*dpr;}
   const me=myPos(); if(FM.follow&&me) FM.center={lat:me.lat,lon:me.lon}; if(!FM.center) FM.center=me?{...me}:{lat:49.75,lon:5.0};
@@ -955,20 +969,18 @@ let fhits=[];
 function drawFlat(){
   const v=view(), me=myPos(); fx.setTransform(v.dpr,0,0,v.dpr,0,0); fx.fillStyle="#e9e6da"; fx.fillRect(0,0,v.W,v.H);
   // fond topographique (en ligne ; mis en cache pour le hors-ligne une fois consulté)
-  let drawn=0;
-  if(FM.topo){ const tz=Math.max(5,Math.min(16,Math.round(FM.z))), k=Math.pow(2,FM.z-tz), sz=TS*k, R=Math.hypot(v.W,v.H)/2+sz;
-    const ctz=merc(FM.center.lat,FM.center.lon,tz); fx.save(); fx.translate(v.ox,v.oy); fx.rotate(v.rot);
-    const x0=Math.floor((ctz.x-R/k)/TS),x1=Math.floor((ctz.x+R/k)/TS),y0=Math.floor((ctz.y-R/k)/TS),y1=Math.floor((ctz.y+R/k)/TS);
-    for(let x=x0;x<=x1;x++) for(let y=y0;y<=y1;y++){ const im=tile(tz,x,y); if(im&&im.complete&&!im.bad&&im.naturalWidth){ fx.drawImage(im,(x*TS-ctz.x)*k,(y*TS-ctz.y)*k,sz+0.5,sz+0.5); drawn++; } }
-    fx.restore(); }
+  if(!BG[FM.bg]) FM.bg="topo";
+  let drawn=0; const B=BG[FM.bg];
+  if(B.under) drawn+=drawLayer(B.under,v);
+  drawn+=drawLayer(FM.bg,v);
   // fond vectoriel de l'atelier : frontière, routes, cours d'eau, localités
   fx.lineJoin="round"; fx.lineCap="round";
   fx.strokeStyle="#6b6b6b"; fx.lineWidth=1.5; fx.setLineDash([10,4,2,4]); line(v,BASE.border); fx.stroke(); fx.setLineDash([]);
-  const vec=!FM.topo||!drawn;
+  const vec=FM.bg==="none"||!drawn;
   if(vec){ fx.strokeStyle="#ffffff"; fx.lineWidth=3; BASE.roads.forEach(r=>{line(v,r);fx.stroke();});
     fx.strokeStyle="#6f9bb6"; fx.lineWidth=3; BASE.riv.forEach(r=>{line(v,r);fx.stroke();}); }
   fx.font="600 13px 'Barlow Condensed',sans-serif"; fx.textAlign="left";
-  if(vec||FM.z<11) BASE.places.forEach(([n,la,lo,k])=>{ if(!k&&FM.z<11) return; const q=S(v,la,lo);
+  if(vec||(FM.bg==="topo"&&FM.z<11)) BASE.places.forEach(([n,la,lo,k])=>{ if(!k&&FM.z<11) return; const q=S(v,la,lo);
     fx.fillStyle="#333"; fx.beginPath(); fx.arc(q.x,q.y,2.5,0,7); fx.fill(); fx.lineWidth=3; fx.strokeStyle="#fffc"; fx.strokeText(n,q.x+5,q.y-4); fx.fillText(n,q.x+5,q.y-4); });
   // front allemand de la phase
   const fr=FRONTS.filter(f=>f.from<=phase).pop();
@@ -999,7 +1011,7 @@ function drawFlat(){
   const lat=FM.center.lat, mpp=156543.03*Math.cos(lat*rad)/Math.pow(2,FM.z); let km=[0.1,0.2,0.5,1,2,5,10,20,50].find(k=>k*1000/mpp>=70)||50;
   const px=km*1000/mpp; fx.fillStyle="#1d231c"; fx.fillRect(14,v.H-128,px,5); fx.font="700 13px 'Barlow Condensed'"; fx.textAlign="left"; fx.fillText((km<1?km*1000+" m":km+" km"),14,v.H-134);
   $("fphase").textContent=(phase+1)+"/"+PHASES.length+" · "+PHASES[phase].lab+" : "+PHASES[phase].t;
-  $("fcap").textContent=FM.capUp?"Cap ↑":"Nord ↑"; $("ftopo").setAttribute("aria-pressed",FM.topo); $("fcenter").setAttribute("aria-pressed",FM.follow);
+  $("fcap").textContent=FM.capUp?"Cap ↑":"Nord ↑"; $("ftopo").textContent=BG[FM.bg].lab; $("fattr").textContent=BG[FM.bg].attr; $("fcenter").setAttribute("aria-pressed",FM.follow);
 }
 function showFlat(on){ if(FM.shown===on) return; FM.shown=on; $("flat").style.display=on?"block":"none"; $("tMap").setAttribute("aria-pressed",on); if(on) $("card").style.display="none"; }
 window.flatTick=()=>{ const now=Date.now();
@@ -1011,7 +1023,7 @@ $("tMap").onclick=()=>{ if(FM.shown){ FM.manual=false; FM.suppress=true; showFla
 $("fclose").onclick=()=>{ FM.manual=false; FM.suppress=true; showFlat(false); };
 $("fcenter").onclick=()=>{ FM.follow=true; };
 $("fcap").onclick=()=>{ FM.capUp=!FM.capUp; store("eht_fcap",FM.capUp); };
-$("ftopo").onclick=()=>{ FM.topo=!FM.topo; store("eht_ftopo",FM.topo); };
+$("ftopo").onclick=()=>{ FM.bg=BGORDER[(BGORDER.indexOf(FM.bg)+1)%BGORDER.length]; store("eht_fbg",FM.bg); ptoast("Fond : "+BG[FM.bg].lab); };
 $("fzin").onclick=()=>{ FM.z=Math.min(17,FM.z+1); store("eht_fz",FM.z); };
 $("fzout").onclick=()=>{ FM.z=Math.max(7,FM.z-1); store("eht_fz",FM.z); };
 $("fprev").onclick=()=>setPhase(phase-1); $("fnext").onclick=()=>setPhase(phase+1);
@@ -1053,7 +1065,7 @@ $("ov").addEventListener("pointerdown",()=>{$("fpanel").style.display="none";});
 // Préchargement des tuiles : zone Bouillon–Sedan–Stonne en z11–13, 3 km autour des stations en z14
 $("prefetch").onclick=async()=>{
   const urls=new Set(), add=(z,la0,la1,lo0,lo1)=>{ const a=merc(la1,lo0,z),b=merc(la0,lo1,z);
-    for(let x=Math.floor(a.x/TS);x<=Math.floor(b.x/TS);x++) for(let y=Math.floor(a.y/TS);y<=Math.floor(b.y/TS);y++) urls.add("https://"+"abc"[(x+y)%3]+".tile.opentopomap.org/"+z+"/"+x+"/"+y+".png"); };
+    for(let x=Math.floor(a.x/TS);x<=Math.floor(b.x/TS);x++) for(let y=Math.floor(a.y/TS);y<=Math.floor(b.y/TS);y++){ urls.add(BG.topo.url(z,x,y)); urls.add(BG.c1950.url(z,x,y)); } };
   [11,12,13].forEach(z=>add(z,49.50,49.90,4.70,5.45));
   STATIONS.forEach(st=>add(14,st.lat-0.027,st.lat+0.027,st.lon-0.042,st.lon+0.042));
   const list=[...urls]; let ok=0,ko=0; $("prefetch").disabled=true;
