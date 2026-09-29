@@ -1,2 +1,2 @@
-{"name":"EHT Bouillon · Vue terrain","short_name":"EHT Bouillon","start_url":"./","display":"fullscreen","orientation":"portrait","background_color":"#1d231c","theme_color":"#1d231c",
+{"name":"EHT Bouillon · Vue terrain","short_name":"EHT Bouillon","start_url":"./","display":"fullscreen","orientation":"any","background_color":"#1d231c","theme_color":"#1d231c",
 "icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}

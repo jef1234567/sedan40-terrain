@@ -71,6 +71,18 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
 #card .row{display:flex;gap:8px;margin-top:8px}
 #target{position:absolute;top:50%;width:0;height:0;display:none;pointer-events:none}
 #target span{position:absolute;transform:translate(-50%,-50%);font:700 15px "Barlow Condensed";background:var(--kaki);color:#1d231c;border-radius:6px;padding:6px 8px;white-space:nowrap}
+@media (orientation:landscape) and (max-height:560px){
+  #top{padding:calc(env(safe-area-inset-top,0px) + 4px) calc(env(safe-area-inset-right,0px) + 10px) 4px calc(env(safe-area-inset-left,0px) + 10px)}
+  #top h1{font-size:17px} #top h1 small{font-size:12px}
+  #top select,#top button{padding:5px 8px}
+  #hud{left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);bottom:calc(env(safe-area-inset-bottom,0px) + 6px)}
+  #radar{width:84px;height:84px}
+  #status{flex:0 1 460px;margin-left:auto;padding:5px 8px;font-size:12px}
+  #dates{margin-top:3px} #dates button{padding:3px 7px}
+  #card{left:auto;right:calc(env(safe-area-inset-right,0px) + 10px);width:min(420px,48vw);top:calc(env(safe-area-inset-top,0px) + 48px);max-height:62%}
+  #start{align-items:center;padding-bottom:16px !important}
+  #start h2{font-size:34px}
+}
 </style>
 </head>
 <body>
@@ -116,8 +128,8 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
   <h2>Réglages</h2>
-  <label>Champ de vision horizontal de la caméra (°)</label>
-  <input id="fov" type="number" value="55" min="30" max="90">
+  <label>Champ de vision horizontal de la caméra (°) — <span id="fovMode">portrait</span>, réglé séparément en portrait et en paysage</label>
+  <input id="fov" type="number" value="55" min="30" max="100">
   <label>Correction de boussole (°) — pour recaler sur un repère connu</label>
   <input id="hcorr" type="number" value="0" step="1">
   <h2>Ajouter une unité</h2>
@@ -485,6 +497,10 @@ function symImg(u){
 
 // ---------- Capteurs ----------
 let gps=null,gpsAcc=null,heading=null,pitch=0,hx=0,hy=0,hasHead=false;
+const scrAngle=()=>(screen.orientation&&typeof screen.orientation.angle==="number")?screen.orientation.angle:(typeof window.orientation==="number"?window.orientation:0);
+const isLand=()=>innerWidth>innerHeight;
+let fovP=55,fovL=70;
+const curFov=()=>isLand()?fovL:fovP;
 const $=id=>document.getElementById(id);
 const posSel=$("posMode");
 STATIONS.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.n;posSel.appendChild(o);});
@@ -492,7 +508,7 @@ posSel.addEventListener("change",()=>{ if(posSel.value!=="gps") $("where").textC
 const myPos=()=>posSel.value!=="gps"?STATIONS.find(s=>s.id===posSel.value):gps;
 function onOrient(e){
   let h=null;
-  if(typeof e.webkitCompassHeading==="number") h=e.webkitCompassHeading;
+  if(typeof e.webkitCompassHeading==="number") h=(e.webkitCompassHeading+scrAngle()+360)%360;
   else if(e.alpha!=null&&(e.absolute||e.type==="deviceorientationabsolute")){
     const a=e.alpha*rad,b=(e.beta||0)*rad,g=(e.gamma||0)*rad;
     const vx=-Math.cos(a)*Math.sin(g)-Math.sin(a)*Math.sin(b)*Math.cos(g), vy=-Math.sin(a)*Math.sin(g)+Math.cos(a)*Math.sin(b)*Math.cos(g);
@@ -503,7 +519,7 @@ function onOrient(e){
   const k=hasHead?0.18:1;
   hx=hx*(1-k)+Math.cos(h*rad)*k; hy=hy*(1-k)+Math.sin(h*rad)*k;
   heading=(Math.atan2(hy,hx)/rad+360)%360; hasHead=true;
-  if(e.beta!=null) pitch=pitch*0.8+(e.beta-90)*0.2;
+  if(e.beta!=null&&e.gamma!=null){ const el=Math.asin(Math.max(-1,Math.min(1,-Math.cos(e.beta*rad)*Math.cos(e.gamma*rad))))/rad; pitch=pitch*0.8+el*0.2; }
 }
 async function start(){
   $("start").style.display="none";
@@ -527,9 +543,12 @@ let camErr=false;
 $("start").style.background="linear-gradient(180deg,rgba(29,35,28,.55) 0%,rgba(29,35,28,.92) 55%,#1d231c 100%), url("+PHOTOS.pz1.src+") center 30%/cover";
 { const c=document.createElement("p"); c.style.cssText="position:absolute;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);margin:0;font-size:11px;color:#a9a58f"; c.textContent="Photo : "+PHOTOS.pz1.credit; $("start").appendChild(c); }
 $("go").onclick=start;
-try{ const s=JSON.parse(localStorage.getItem("eht_bouillon_set")||"{}"); if(s.fov)$("fov").value=s.fov; if(s.hcorr!=null)$("hcorr").value=s.hcorr; }catch(e){}
-const saveSet=()=>{ try{ localStorage.setItem("eht_bouillon_set",JSON.stringify({fov:$("fov").value,hcorr:$("hcorr").value})); }catch(e){} };
-$("fov").addEventListener("change",saveSet); $("hcorr").addEventListener("change",saveSet);
+try{ const s=JSON.parse(localStorage.getItem("eht_bouillon_set")||"{}"); if(s.fovP)fovP=+s.fovP; else if(s.fov)fovP=+s.fov; if(s.fovL)fovL=+s.fovL; if(s.hcorr!=null)$("hcorr").value=s.hcorr; }catch(e){}
+const saveSet=()=>{ try{ localStorage.setItem("eht_bouillon_set",JSON.stringify({fovP,fovL,hcorr:$("hcorr").value})); }catch(e){} };
+const showFov=()=>{ $("fov").value=curFov(); $("fovMode").textContent=isLand()?"paysage":"portrait"; };
+showFov(); addEventListener("resize",showFov);
+$("fov").addEventListener("change",()=>{ const v=Math.max(30,Math.min(100,+$("fov").value||55)); if(isLand())fovL=v; else fovP=v; showFov(); saveSet(); });
+$("hcorr").addEventListener("change",saveSet);
 
 // ---------- Dates ----------
 const phPrev=document.createElement("button"),phNext=document.createElement("button"),phLab=document.createElement("button");
@@ -552,7 +571,7 @@ function loop(){
   if(cv.width!==Math.round(W*dpr)){cv.width=W*dpr;cv.height=H*dpr;}
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   const me=myPos(); hits=[];
-  const hfov=+$("fov").value||55, vfov=hfov*H/W;
+  const hfov=curFov(), vfov=2*Math.atan(Math.tan(hfov/2*rad)*H/W)/rad;
   $("headTxt").textContent=heading==null?"Cap : boussole indisponible":"Cap "+Math.round(heading)+"°";
   $("accTxt").textContent=posSel.value==="gps"&&gpsAcc?" · GPS ±"+Math.round(gpsAcc)+" m":"";
   const tgt=$("target");
@@ -617,7 +636,7 @@ function drawRadar(me){
   const h=heading||0, ms=markers().filter(visible);
   let far=0; if(me) ms.forEach(m=>{far=Math.max(far,distBrg(me,m).d);});
   const maxD=[5000,12000,25000,50000,80000].find(v=>v>=far)||80000;
-  if(heading!=null){ const hf=(+$("fov").value||55)/2*rad; rctx.fillStyle="#c4b98a33"; rctx.beginPath(); rctx.moveTo(c,c); rctx.arc(c,c,c,-Math.PI/2-hf,-Math.PI/2+hf); rctx.fill(); }
+  if(heading!=null){ const hf=curFov()/2*rad; rctx.fillStyle="#c4b98a33"; rctx.beginPath(); rctx.moveTo(c,c); rctx.arc(c,c,c,-Math.PI/2-hf,-Math.PI/2+hf); rctx.fill(); }
   rctx.fillStyle="#c4b98a"; rctx.font="700 22px 'Barlow Condensed'"; rctx.textAlign="center";
   const na=(-h-90)*rad; rctx.fillText("N",c+Math.cos(na)*(c-16),c+Math.sin(na)*(c-16)+8);
   rctx.fillStyle="#a9a58f"; rctx.font="600 18px 'Barlow Condensed'"; rctx.fillText(maxD/1000+" km",c,S-10);
