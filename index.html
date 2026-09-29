@@ -164,7 +164,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
     </div>
     <p class="warn">Symboles et ordres de bataille repris des figuratifs de l'EDG-T. Positions indicatives, à recaler avec les fascicules (menu ☰). Du 9 au 12 mai, chaque position porte son niveau de fiabilité.</p>
     <button id="go">Activer caméra et boussole</button>
-    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 11 h 45</p>
+    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 14 h 50</p>
   </div>
 </div>
 
@@ -177,7 +177,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
 
 <div id="sheet">
   <button id="closeSheet">Fermer</button>
-  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 11 h 45</p>
+  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 14 h 50</p>
   <h2>Ordre de bataille</h2>
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
@@ -270,6 +270,8 @@ const ODB = [
          {d:[15], lat:49.5510, lon:4.9270, lieu:"Stonne", note:"Village pris et repris du 15 au 17 mai."}]},
   {id:"niwi", s:"A", t:"inf", e:"", num:"Niwi", par:"GD", parent:"igrd", name:"Détachement Niwi (IGRD)",
     pos:[{d:[10], lat:49.8680, lon:5.6000, lieu:"Nives / Witry", note:"Au matin du 10 mai, éléments posés en Fieseler Storch sur les arrières belges."}]},
+  {id:"pzr2", s:"A", t:"arm", e:"III", num:"2", par:"1", parent:"pz1", name:"Panzer-Regiment 2"},
+  {id:"ar73", s:"A", t:"art", e:"II", num:"I/73", par:"1", parent:"pz1", name:"I./Artillerie-Regiment 73"},
   {id:"sr1", s:"A", t:"mot", e:"III", num:"1", par:"1", parent:"pz1", name:"Schützen-Regiment 1"},
   {id:"ak14", s:"A", t:"inm", e:"XXX", num:"14", par:"", parent:"kleist", name:"XIV. AK (mot.) — von Wietersheim, 2e échelon"},
   {id:"id13", s:"A", t:"inm", e:"XX", num:"13", par:"14", parent:"ak14", name:"13. Infanterie-Division (mot.)"},
@@ -302,6 +304,9 @@ const ODB = [
     comp:"6e BC (11e Cuir, 12e RCh), 15e BLM (5e RAM, 15e RDP), 78e RA. Renforts : 12e GRCA, 60e et 64e GRDI, I/295e RI, III/12e RZ.",
     pos:[{d:[10,11], lat:49.8410, lon:5.4350, lieu:"Bond vers Neufchâteau", note:"Cavalerie « Ardennes » de la 2e armée, au contact en Ardenne belge. Position approximative."}]},
   {id:"bc6", s:"F", t:"cav", e:"X", num:"6", par:"5", parent:"dlc5", name:"6e BC — de Colstoun", comp:"11e Cuirassiers, 12e Chasseurs."},
+  {id:"cuir11", s:"F", t:"cav", e:"III", num:"11", par:"6", parent:"bc6", name:"11e régiment de cuirassiers"},
+  {id:"grdi60", s:"F", t:"cav", e:"II", num:"60", par:"", parent:"dlc5", name:"Détachement du 60e GRDI"},
+  {id:"ra78b", s:"F", t:"art", e:"I", num:"78", par:"5", parent:"dlc5", name:"Batterie du 78e RA (IIe batterie selon Wikipédia)"},
   {id:"blm15", s:"F", t:"blm", e:"X", num:"15", par:"5", parent:"dlc5", name:"15e BLM — Evain", comp:"5e RAM (AMD 35, H39), 15e RDP (AMR 33)."},
   {id:"dlc2", s:"F", t:"cav", e:"XX", num:"2", parent:"a2", name:"2e DLC",
     pos:[{d:[10,11], lat:49.6730, lon:5.6000, lieu:"Étalle", note:"Accrochages avec la 10. Pz. Position approximative."}]},
@@ -340,7 +345,10 @@ const PHASES=[
  {d:9,lab:"9 mai soir",fb:"R",t:"Les colonnes serrent sur la frontière",f:"Dans la nuit du 9 au 10, les colonnes serrent sur les points de passage de Wallendorf, Vianden et Echternach.",q:"Qu'aurait dû voir le renseignement allié la veille de l'offensive ?"},
  {d:10,lab:"10 mai matin",fb:"S",t:"4 h 35 : l'entrée au Luxembourg",f:"Les trois Panzerdivisions franchissent la frontière luxembourgeoise. Premier contact vers 7 h au point d'appui belge de Martelange. La cavalerie française entre en Belgique.",q:"Qu'est-ce qui a permis aux Allemands de faire passer autant de véhicules par un terrain réputé difficile ?"},
  {d:10,lab:"10 mai soir",fb:"S",t:"Bodange et Étalle",f:"À Bodange, une cinquantaine de chasseurs ardennais privés d'ordre de repli arrêtent la 1. Pz jusqu'après 18 h. Au nord d'Arlon, la 10. Pz repousse la 2e DLC derrière la Semois.",q:"Que vaut une résistance de quelques heures face à un adversaire qui a des jours d'avance ?"},
- {d:11,lab:"11 mai matin",fb:"S",t:"La 5e DLC face à trois Panzerdivisions",f:"La 1. Pz prend Neufchâteau, la 2. Pz attaque Libramont, la 10. Pz surgit au sud de Neufchâteau après un grand détour.",q:"Une division de cavalerie peut-elle couvrir un front face à un corps blindé ?"},
+ {d:11,lab:"11 mai, aube",fb:"R",t:"Neufchâteau : le dispositif de la 5e DLC",f:"Le 11e cuirassiers tient Neufchâteau et ses abords est (Longlier, Hamipré) ; un détachement du 60e GRDI couvre le sud ; une batterie du 78e RA appuie depuis l'ouest, vers Petitvoir. La 15e BLM du colonel Évain est au sud-est. La 1. Pz arrive de Bodange.",q:"Où placeriez-vous l'artillerie et la réserve pour tenir Neufchâteau face à une division blindée ?"},
+ {d:11,lab:"11 mai matin",fb:"S",t:"Longlier et Hamipré : l'assaut frontal repoussé",f:"Le Panzer-Regiment 2, appuyé par le I./Artillerie-Regiment 73, attaque de front à Longlier et Hamipré. Les cavaliers détruisent plusieurs chars ; l'attaque est arrêtée.",q:"Pourquoi une attaque frontale de chars échoue-t-elle face à une défense de cavalerie légère ?"},
+ {d:11,lab:"11 mai, 10 h 30",fb:"S",t:"Le contournement par le sud",f:"Kirchner renonce au front et déborde par le sud, là où la défense est mince. Le 60e GRDI, qui a reçu ses ordres trop tard, est surpris. Plusieurs heures de combat à Montplainchamps.",q:"Qu'est-ce qui rend un flanc vulnérable : le terrain, les délais de transmission des ordres, ou la jonction entre deux unités ?"},
+ {d:11,lab:"11 mai, midi",fb:"S",t:"Petitvoir : l'artillerie surprise, repli à 13 h",f:"Débouchant de Montplainchamps, les Allemands atteignent Petitvoir et surprennent l'artillerie française qui appuie la défense de la ville. Menacés d'encerclement, les Français reçoivent l'ordre de repli à 13 h ; Neufchâteau tombe.",q:"Comment protéger ses appuis quand l'ennemi déborde par les arrières ?"},
  {d:11,lab:"11 mai soir",fb:"S",t:"Bouillon : la cavalerie freine, puis cède",f:"La 5e DLC, renforcée de dragons portés et d'un escadron du 12e GRCA, repasse la Semois ; le pont de Bouillon saute. Kleist ordonne de réorienter la 10. Pz vers Longwy. Dans la nuit, tête de pont allemande à Mouzaive.",q:"Jusqu'où une mission de retardement doit-elle aller avant de décrocher ?"},
  {d:12,lab:"12 mai matin",fb:"S",t:"La Semois franchie",f:"Bouillon tombe au matin. La Semois est franchie à Vresse (2. Pz) et entre Cugnon et Herbeumont (10. Pz). Guderian installe son PC à l'hôtel Panorama.",q:"Pourquoi la perte de Mouzaive fait-elle tomber toute la ligne de la Semois ?"},
  {d:12,lab:"12 mai soir",fb:"S",t:"Sur la Meuse, les ponts sautent",f:"Vers 17 h, les restes de la 5e DLC repassent la Meuse ; les ponts de Sedan sont détruits et les Allemands entrent dans la ville. Le franchissement est fixé au 13 mai, 16 h.",q:"Faut-il attendre l'artillerie lourde avant de franchir un fleuve défendu ?"},
@@ -420,7 +428,6 @@ const HALF=[
  ["pz1",[1],L(49.874,6.29),"Wallendorf",0,"R","Aux abords du point de passage."],
  ["pz1",[2],L(49.831,5.738),"Martelange",0,"S","Traverse le Luxembourg ; contact vers 7 h avec les chasseurs ardennais."],
  ["pz1",[3],L(49.8536,5.698),"Bodange",0,"S","Arrêtée jusqu'après 18 h ; les chars restent pris dans les encombrements du Luxembourg."],
- ["pz1",[4],L(49.841,5.435),"Neufchâteau",0,"S","Prend Neufchâteau."],
  ["pz1",[5],L(49.813,5.084),"Devant Bouillon",0,"R","Au nord de la Semois ; tête de pont de nuit à Mouzaive."],
  ["pz1",[6],L(49.794,5.066),"Bouillon",0,"S","Prend Bouillon au matin et franchit la Semois."],
  ["pz1",[7],L(49.715,4.935),"Nord de Sedan",0,"R","Premiers éléments à Sedan, rive nord."],
@@ -443,10 +450,9 @@ const HALF=[
  ["niwi",[2],L(49.868,5.600),"Nives / Witry",0,"S","Éléments posés en Fieseler Storch sur les arrières belges."],
  ["bodange",[0,1,2],L(49.8536,5.698),"Bodange",0,"S","Deux pelotons de la 5e compagnie (capitaine Bricart) en mission de retardement."],
  ["bodange",[3],L(49.8536,5.698),"Bodange",0,"S","Privés de l'ordre de repli, ils tiennent face à plus de 3 000 Allemands et déposent les armes après 18 h, laissant 9 tués dont leur capitaine."],
- ["dlc5",[0,1],L(49.66,4.95),"Au sud de la Meuse",0,"q","En France avant l'entrée en Belgique (position à confirmer)."],
+ ["dlc5",[0,1],L(49.677,4.980),"PC à Bazeilles",0,"R","Le PC de la division est à Bazeilles le 10 mai ; position du 9 mai déduite."],
  ["dlc5",[2],L(49.75,5.19),"Bouillon – Florenville",0,"R","Débouche au-delà de la Semois."],
  ["dlc5",[3],L(49.88,5.41),"Neufchâteau – Libramont",0,"S","Atteint la ligne prévue le soir du 10 mai."],
- ["dlc5",[4],L(49.88,5.41),"Neufchâteau – Libramont",0,"S","Aux prises avec les trois Panzerdivisions."],
  ["dlc5",[5],L(49.790,5.065),"Bouillon, rive sud",0,"S","Défend Bouillon avec deux compagnies du I/295e RI (55e DI)."],
  ["dlc5",[6],L(49.75,5.00),"Repli vers la Meuse",0,"R","Prise de flanc après la perte de Mouzaive."],
  ["dlc5",[7],L(49.66,4.93),"Derrière la Meuse",0,"S","Vers 17 h, les restes de la division repassent la Meuse."],
@@ -483,6 +489,39 @@ HALF.forEach(([id,ph,p,lieu,b,f,note])=>SIT.push({id,ph,lat:p.lat,lon:p.lon,lieu
 const REPU={s:"N",t:"rep",e:"",num:"",par:""};
 REP.forEach(([ph,x,y,n])=>{const p=T(x,y); SIT.push({id:null,rep:n,ph:ph.flatMap(REMAP),lat:p.lat,lon:p.lon,lieu:n});});
 REP2.forEach(([ph,p,n,f,note])=>SIT.push({id:null,rep:n,ph,lat:p.lat,lon:p.lon,lieu:n,f,note}));
+// Focus Neufchâteau – Petitvoir : l'ancienne phase « 11 mai matin » (4) devient 4 sous-phases (4 à 7), les suivantes sont décalées de 3
+const SHIFT=i=>i<4?[i]:i===4?[4,5,6,7]:[i+3];
+SIT.forEach(e=>{e.ph=[...new Set(e.ph.flatMap(SHIFT))];});
+FRONTS.forEach(f=>{ if(f.from>4) f.from+=3; });
+const FOCUS=[
+ // [unité, phases, position, lieu, désorganisée, fiabilité, note]
+ ["pz1",[4],L(49.868,5.520),"Approche par l'est",0,"R","Arrive de Bodange vers Neufchâteau."],
+ ["pz1",[5],L(49.860,5.495),"Devant Longlier",0,"R","Engage son régiment de chars de front."],
+ ["pz1",[6],L(49.8175,5.4725),"Cousteumont",0,"R","Déborde par le sud ; une source situe la percée vers Cousteumont vers 10 h 30."],
+ ["pz1",[7],L(49.8441,5.3830),"Petitvoir",0,"S","Atteint Petitvoir par le sud-ouest et surprend l'artillerie française."],
+ ["pzr2",[5],L(49.846,5.458),"Longlier – Hamipré",0,"S","Attaque frontale repoussée ; plusieurs chars détruits."],
+ ["pzr2",[6],L(49.8201,5.4176),"Montplainchamps",0,"S","Plusieurs heures de combat à Montplainchamps."],
+ ["pzr2",[7],L(49.838,5.395),"Vers Petitvoir",0,"R","Débouche sur les arrières de la défense de Neufchâteau."],
+ ["ar73",[5,6],L(49.862,5.505),"Est de Longlier",0,"R","Appuie l'attaque du Panzer-Regiment 2."],
+ ["cuir11",[4,5],L(49.846,5.450),"Neufchâteau – Longlier – Hamipré",0,"S","Défend les abords est de la ville."],
+ ["cuir11",[6],L(49.841,5.435),"Neufchâteau",0,"S","Tient la ville ; le débordement par le sud menace ses arrières."],
+ ["cuir11",[7],L(49.835,5.300),"Repli vers la Semois",0,"R","Ordre de repli à 13 h."],
+ ["grdi60",[4,5],L(49.822,5.430),"Sud de Neufchâteau",0,"R","Couvre le sud de la ville (position approximative)."],
+ ["grdi60",[6],L(49.8201,5.4176),"Montplainchamps",1,"S","Ordres reçus tardivement : surpris par l'attaque blindée."],
+ ["ra78b",[4,5,6],L(49.8441,5.3830),"Petitvoir",0,"R","En appui de la défense de Neufchâteau, depuis l'ouest (emplacement exact à confirmer)."],
+ ["ra78b",[7],L(49.8441,5.3830),"Petitvoir",1,"S","Surprise par l'arrivée des blindés allemands."],
+ ["blm15",[4,5],L(49.800,5.480),"Sud-est de Neufchâteau",0,"q","Position à confirmer."],
+ ["blm15",[6],L(49.800,5.480),"Sud-est de Neufchâteau",0,"R","La percée se fait à sa jonction avec le 11e cuirassiers, selon une source."],
+ ["dlc5",[4,5,6],L(49.841,5.435),"Neufchâteau",0,"S","Aux prises avec les trois Panzerdivisions : la 1. Pz à Neufchâteau, la 2. Pz à Libramont, la 10. Pz au sud."],
+ ["dlc5",[7],L(49.830,5.300),"Repli vers Bouillon",0,"S","Repli ordonné à 13 h ; Neufchâteau tombe."]
+];
+FOCUS.forEach(([id,ph,p,lieu,b,f,note])=>SIT.push({id,ph,lat:p.lat,lon:p.lon,lieu,b:!!b,f,note}));
+[[[4,5,6,7],L(49.8441,5.3830),"Petitvoir","S","Le hameau où débouchent les blindés allemands vers midi le 11 mai, sur les arrières de la défense de Neufchâteau."],
+ [[5],L(49.8562,5.4609),"Longlier","S","Assaut frontal du Panzer-Regiment 2 repoussé le 11 au matin."],
+ [[5],L(49.8360,5.4564),"Hamipré","S","Assaut frontal repoussé."],
+ [[6,7],L(49.8201,5.4176),"Montplainchamps","S","Plusieurs heures de combat pendant le débordement par le sud."],
+ [[6],L(49.8175,5.4725),"Cousteumont","q","Lieu de la percée de 10 h 30 selon une source (à confirmer)."]
+].forEach(([ph,p,n,f,note])=>SIT.push({id:null,rep:n,ph,lat:p.lat,lon:p.lon,lieu:n,f,note}));
 let phase=0;
 let custom=[];
 try{ custom=JSON.parse(localStorage.getItem("eht_bouillon_custom")||"[]"); }catch(e){}
@@ -993,12 +1032,14 @@ function drawFlat(){
   // visée et guidage
   if(me&&target){ const a=S(v,me.lat,me.lon),b=S(v,target.lat,target.lon); fx.strokeStyle="#8a7a2e"; fx.lineWidth=2.5; fx.setLineDash([4,5]); fx.beginPath(); fx.moveTo(a.x,a.y); fx.lineTo(b.x,b.y); fx.stroke(); fx.setLineDash([]); }
   // unités
-  fhits=[]; const ms=markers().filter(visible), ssz=Math.max(34,Math.min(58,FM.z*4));
+  fhits=[]; const ms=markers().filter(visible).sort((a,b)=>(target&&b.key===target.key)-(target&&a.key===target.key)||(!!a.rep)-(!!b.rep)), ssz=Math.max(34,Math.min(58,FM.z*4)), lbox=[];
   ms.forEach(m=>{ const q=S(v,m.lat,m.lon); if(q.x<-80||q.y<-80||q.x>v.W+80||q.y>v.H+80) return;
     const masked=isMasked(m); fx.globalAlpha=(m.b||masked)?0.45:1;
     const im=symImg(m.u); if(im.complete) fx.drawImage(im,q.x-ssz/2,q.y-ssz*0.4,ssz,ssz*0.8); fx.globalAlpha=1;
     const lab=m.rep?m.lieu:m.u.name.split(" — ")[0]; fx.font="700 13px 'Barlow Condensed',sans-serif"; fx.textAlign="center";
-    fx.lineWidth=3.5; fx.strokeStyle="#fffe"; fx.strokeText(lab+(masked?" · masqué":""),q.x,q.y+ssz*0.5+10); fx.fillStyle=target&&target.key===m.key?"#6b5b12":"#111"; fx.fillText(lab+(masked?" · masqué":""),q.x,q.y+ssz*0.5+10);
+    const txt=lab+(masked?" · masqué":""), tw=fx.measureText(txt).width, bx={x:q.x-tw/2-2,y:q.y+ssz*0.5-2,w:tw+4,h:16};
+    if(!lbox.some(k=>bx.x<k.x+k.w&&bx.x+bx.w>k.x&&bx.y<k.y+k.h&&bx.y+bx.h>k.y)){ lbox.push(bx);
+      fx.lineWidth=3.5; fx.strokeStyle="#fffe"; fx.strokeText(txt,q.x,q.y+ssz*0.5+10); fx.fillStyle=target&&target.key===m.key?"#6b5b12":"#111"; fx.fillText(txt,q.x,q.y+ssz*0.5+10); }
     fhits.push({x:q.x,y:q.y,r:ssz/2,m}); });
   // moi : précision, cône de visée
   if(me){ const q=S(v,me.lat,me.lon);

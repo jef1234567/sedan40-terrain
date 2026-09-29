@@ -1,5 +1,5 @@
 // Page : réseau d'abord, sans cache HTTP (GitHub Pages garde 10 min), cache de l'appli en secours hors ligne. Tuiles et polices : cache d'abord, rangées en mode CORS.
-const C='sedan40-terrain-v8', TILES='sedan40-tuiles-v1';
+const C='sedan40-terrain-v9', TILES='sedan40-tuiles-v1';
 const FILES=['./','index.html','manifest.json','icon.svg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C&&x!==TILES).map(x=>caches.delete(x)))));self.clients.claim();});
