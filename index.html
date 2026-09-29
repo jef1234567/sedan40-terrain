@@ -176,6 +176,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
 
 <div id="sheet">
   <button id="closeSheet">Fermer</button>
+  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 10 h 20</p>
   <h2>Ordre de bataille</h2>
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
@@ -567,7 +568,10 @@ const posSel=$("posMode");
 STATIONS.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.n;posSel.appendChild(o);});
 posSel.addEventListener("change",()=>{ if(posSel.value!=="gps") $("where").textContent=STATIONS.find(s=>s.id===posSel.value).n; });
 const myPos=()=>posSel.value!=="gps"?STATIONS.find(s=>s.id===posSel.value):gps;
+function onTilt(e){ if(e.beta!=null&&e.gamma!=null){ const el=Math.asin(Math.max(-1,Math.min(1,-Math.cos(e.beta*rad)*Math.cos(e.gamma*rad))))/rad; pitch=pitch*0.8+el*0.2; tiltOK=true; } }
+let tiltOK=false;
 function onOrient(e){
+  onTilt(e);
   let h=null;
   if(typeof e.webkitCompassHeading==="number") h=(e.webkitCompassHeading+scrAngle()+360)%360;
   else if(e.alpha!=null&&(e.absolute||e.type==="deviceorientationabsolute")){
@@ -580,13 +584,13 @@ function onOrient(e){
   const k=hasHead?0.18:1;
   hx=hx*(1-k)+Math.cos(h*rad)*k; hy=hy*(1-k)+Math.sin(h*rad)*k;
   heading=(Math.atan2(hy,hx)/rad+360)%360; hasHead=true;
-  if(e.beta!=null&&e.gamma!=null){ const el=Math.asin(Math.max(-1,Math.min(1,-Math.cos(e.beta*rad)*Math.cos(e.gamma*rad))))/rad; pitch=pitch*0.8+el*0.2; }
 }
 async function start(){
   $("start").style.display="none";
   try{ if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function") await DeviceOrientationEvent.requestPermission(); }catch(e){}
   if("ondeviceorientationabsolute" in window) window.addEventListener("deviceorientationabsolute",onOrient);
   else window.addEventListener("deviceorientation",onOrient);
+  if("ondeviceorientationabsolute" in window) window.addEventListener("deviceorientation",onTilt);
   try{ $("cam").srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false}); }
   catch(e){ camErr=true; }
   if(navigator.geolocation){
@@ -998,7 +1002,7 @@ function drawFlat(){
 }
 function showFlat(on){ if(FM.shown===on) return; FM.shown=on; $("flat").style.display=on?"block":"none"; $("tMap").setAttribute("aria-pressed",on); if(on) $("card").style.display="none"; }
 window.flatTick=()=>{ const now=Date.now();
-  if(!FM.manual&&heading!=null){ // bascule automatique : téléphone à plat → carte ; relevé → caméra
+  if(!FM.manual&&tiltOK){ // bascule automatique : téléphone à plat → carte ; relevé → caméra
     if(pitch<-55){ FM.highT=0; if(!FM.lowT) FM.lowT=now; if(!FM.suppress&&now-FM.lowT>500) showFlat(true); }
     else if(pitch>-35){ FM.lowT=0; FM.suppress=false; if(!FM.highT) FM.highT=now; if(now-FM.highT>500) showFlat(false); } }
   if(FM.shown){ drawFlat(); return true; } return false; };
