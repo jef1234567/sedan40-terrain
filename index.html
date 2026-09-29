@@ -164,6 +164,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
     </div>
     <p class="warn">Symboles et ordres de bataille repris des figuratifs de l'EDG-T. Positions indicatives, à recaler avec les fascicules (menu ☰). Du 9 au 12 mai, chaque position porte son niveau de fiabilité.</p>
     <button id="go">Activer caméra et boussole</button>
+    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 10 h 40</p>
   </div>
 </div>
 
@@ -176,7 +177,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
 
 <div id="sheet">
   <button id="closeSheet">Fermer</button>
-  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 10 h 20</p>
+  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 10 h 40</p>
   <h2>Ordre de bataille</h2>
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
@@ -185,7 +186,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
   <div class="row" style="margin-top:8px"><button id="navGo">Guider</button><button id="navStop">Arrêter le guidage</button></div>
   <p class="warn" style="color:var(--dim);margin:6px 0 0">En mode GPS, l'arrivée à moins de 40 m enchaîne sur la station suivante de la liste.</p>
   <h2>Carte hors ligne</h2>
-  <p class="warn" style="color:var(--dim);margin:0 0 6px">À faire avec du réseau, avant de partir : télécharge le fond topographique de Bouillon à Stonne (environ 450 tuiles) et le garde sur le téléphone.</p>
+  <p class="warn" style="color:var(--dim);margin:0 0 6px">À faire avec du réseau, avant de partir : télécharge le fond topographique de Bouillon à Stonne (environ 500 tuiles, une à deux minutes) et le garde sur le téléphone.</p>
   <button id="prefetch" style="width:100%">Préparer la carte hors ligne</button>
   <p class="warn" id="prefTxt" style="color:var(--dim);margin:6px 0 0"></p>
   <h2>Réglages</h2>
@@ -911,13 +912,13 @@ async function computeRelief(){
   const list=markers().filter(visible).filter(m=>m.key!=="nav").map(m=>({m,d:dist2(me,m)})).filter(o=>o.d>150&&o.d<30000);
   RELIEF.busy=true; RELIEF.msg="Relief : calcul…"; RELIEF.dirty=false; RELIEF.pos={...me}; RELIEF.ph=phase;
   try{
-    const rays=list.map(o=>{ const n=Math.max(12,Math.min(90,Math.round(o.d/150))), b=distBrg(me,o.m).b, pts=[];
+    const rays=list.map(o=>{ const n=Math.max(12,Math.min(200,Math.round(o.d/150))), b=distBrg(me,o.m).b, pts=[];
       for(let i=1;i<n;i++) pts.push({...destPoint(me,o.d*i/n,b),d:o.d*i/n}); return {...o,pts}; });
     await elevAll([me,...list.map(o=>o.m),...rays.flatMap(r=>r.pts)]);
     const K=0.87/(2*6371000), e=p=>RELIEF.elev[ek(p.lat,p.lon)], h0=e(me)+1.7, res={}; let nm=0;
     rays.forEach(r=>{ const at=(e(r.m)+4-K*r.d*r.d-h0)/r.d;
       const hid=r.pts.some(p=>(e(p)-K*p.d*p.d-h0)/p.d>at+0.0008); res[r.m.key]=hid?"m":"v"; if(hid) nm++; });
-    RELIEF.res=res; RELIEF.msg="Relief : "+nm+" masqué(s) sur "+rays.length+" (terrain nu, sans végétation)";
+    RELIEF.res=res; RELIEF.msg="Relief : "+nm+" masqué(s) sur "+rays.length+" à moins de 30 km (terrain nu, sans végétation)";
   }catch(err){ RELIEF.msg="Relief : réseau indisponible"; RELIEF.dirty=true; }
   RELIEF.busy=false;
 }
@@ -1062,7 +1063,9 @@ $("prefetch").onclick=async()=>{
   $("prefetch").disabled=false; };
 })();
 
-if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+if("serviceWorker" in navigator) addEventListener("load",()=>navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{}));
+// Nouvelle version détectée : rechargement automatique une seule fois
+if("serviceWorker" in navigator){ let reloaded=false; navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloaded||$("start").style.display==="none") return; reloaded=true; location.reload(); }); }
 </script>
 </body>
 </html>
