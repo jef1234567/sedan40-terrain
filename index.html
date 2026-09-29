@@ -564,21 +564,38 @@ function loop(){
       const x=W/2+r/hfov*W; ctx.fillRect(x,hy0-(a%30?4:8),1,a%30?8:16);
       if(a%90===0) ctx.fillText("NESO"[a/90],x,hy0-12); else if(a%30===0) ctx.fillText(a,x,hy0-12); }
     const list=markers().filter(visible).map(m=>({m,...distBrg(me,m)})).sort((a,b)=>b.d-a.d);
-    let n=0;
+    // Perspective : taille inversement proportionnelle à la distance (110 px à 1,5 km), bornée entre 26 et 120 px.
+    // Les unités lointaines, petites, restent au ras de l'horizon ; les proches, grandes, montent au-dessus.
+    let n=0; const lay=[];
     list.forEach(o=>{
       const r=((o.b-heading+540)%360)-180; if(Math.abs(r)>hfov/2+5) return;
-      const x=W/2+r/hfov*W, sz=Math.max(60,Math.min(110,110-Math.log10(o.d+1)*12));
-      const y=hy0-40-Math.min(130,Math.log10(o.d+10)*27); n++;
-      const isT=target&&target.key===o.m.key;
-      ctx.strokeStyle=isT?"#c4b98a":"#ffffff88"; ctx.lineWidth=isT?3:1; ctx.beginPath(); ctx.moveTo(x,y+sz*0.35); ctx.lineTo(x,hy0); ctx.stroke();
-      const im=symImg(o.m.u); ctx.globalAlpha=o.m.b?0.55:1; if(im.complete) ctx.drawImage(im,x-sz/2,y-sz*0.4,sz,sz*0.8); ctx.globalAlpha=1;
-      ctx.font="600 13px 'Barlow Condensed'"; ctx.textAlign="center";
-      const label=(o.m.rep?o.m.lieu:(o.m.u.name.split(" — ")[0]+(o.m.b?" (désorganisée)":"")))+(o.m.f==="q"?" (?)":""), dl=(o.m.rep?"":o.m.lieu+" · ")+fmtD(o.d);
-      const tw=Math.max(ctx.measureText(label).width,ctx.measureText(dl).width)+10;
-      ctx.fillStyle=isT?"#c4b98a":"#000a"; ctx.fillRect(x-tw/2,y+sz*0.42,tw,32);
-      ctx.fillStyle=isT?"#1d231c":"#fff"; ctx.fillText(label,x,y+sz*0.42+13);
-      ctx.fillStyle=isT?"#1d231c":"#c4b98a"; ctx.fillText(dl,x,y+sz*0.42+27);
-      hits.push({x,y,r:sz/2,o});
+      const sz=Math.max(26,Math.min(120,110*1500/Math.max(o.d,1))), pole=6+sz*0.3;
+      lay.push({o,x:W/2+r/hfov*W,sz,top:hy0-pole-sz*0.8,pole}); n++;
+    });
+    // Étiquettes placées du plus proche au plus lointain : au-dessus, à droite ou à gauche du symbole ; sinon masquée (touchez le symbole).
+    const boxes=[], hitB=q=>boxes.some(k=>q.x<k.x+k.w&&q.x+q.w>k.x&&q.y<k.y+k.h&&q.y+q.h>k.y);
+    const isTg=L=>target&&target.key===L.o.m.key;
+    lay.slice().sort((p,q)=>(isTg(q)-isTg(p))||(p.o.d-q.o.d)).forEach(L=>{
+      const {o,x,sz,top}=L, fs=Math.round(Math.max(11,Math.min(16,9+sz*0.06)));
+      L.fs=fs; L.label=(o.m.rep?o.m.lieu:(o.m.u.name.split(" — ")[0]+(o.m.b?" (désorganisée)":"")))+(o.m.f==="q"?" (?)":"");
+      L.dl=(o.m.rep?"":o.m.lieu+" · ")+fmtD(o.d);
+      ctx.font=`600 ${fs}px 'Barlow Condensed'`;
+      const tw=Math.max(ctx.measureText(L.label).width,ctx.measureText(L.dl).width)+10, th=fs*2+6;
+      const cands=[[x-tw/2,top-th-3],[x+sz/2+4,top+sz*0.4-th/2],[x-sz/2-4-tw,top+sz*0.4-th/2]];
+      L.lb=null;
+      for(const [lx,ly] of cands){ const q={x:Math.max(4,Math.min(W-tw-4,lx)),y:ly,w:tw,h:th};
+        if(q.y<70) continue; if(!hitB(q)||isTg(L)){ L.lb=q; boxes.push(q); break; } }
+      boxes.push({x:x-sz/2,y:top,w:sz,h:sz*0.8});
+    });
+    lay.forEach(L=>{ // dessin du plus lointain au plus proche
+      const {o,x,sz,top,pole}=L, isT=isTg(L);
+      ctx.strokeStyle=isT?"#c4b98a":"#ffffff88"; ctx.lineWidth=isT?3:1; ctx.beginPath(); ctx.moveTo(x,hy0-pole); ctx.lineTo(x,hy0); ctx.stroke();
+      const im=symImg(o.m.u); ctx.globalAlpha=o.m.b?0.55:1; if(im.complete) ctx.drawImage(im,x-sz/2,top,sz,sz*0.8); ctx.globalAlpha=1;
+      if(L.lb){ const q=L.lb; ctx.font=`600 ${L.fs}px 'Barlow Condensed'`; ctx.textAlign="center";
+        ctx.fillStyle=isT?"#c4b98a":"#000b"; ctx.fillRect(q.x,q.y,q.w,q.h);
+        ctx.fillStyle=isT?"#1d231c":"#fff"; ctx.fillText(L.label,q.x+q.w/2,q.y+L.fs+1);
+        ctx.fillStyle=isT?"#1d231c":"#c4b98a"; ctx.fillText(L.dl,q.x+q.w/2,q.y+L.fs*2+3); }
+      hits.push({x,y:top+sz*0.4,r:Math.max(sz/2,22),o});
     });
     // cible hors champ
     if(target){
