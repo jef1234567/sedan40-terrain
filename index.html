@@ -101,7 +101,9 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
 #fhead button{min-height:48px;min-width:48px}
 #fphase{flex:1;font:600 15px 'Barlow Condensed',sans-serif;line-height:1.2}
 #fbar{position:absolute;left:calc(env(safe-area-inset-left,0px) + 10px);right:calc(env(safe-area-inset-right,0px) + 10px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);display:flex;gap:6px;flex-wrap:wrap}
-#fbar button{min-height:50px;flex:1;min-width:60px;background:#1d231cee}
+#fbar button{min-height:50px;flex:1;min-width:0;padding:6px 4px;background:#1d231cee}
+#fzoom{position:absolute;right:calc(env(safe-area-inset-right,0px) + 10px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
+#fzoom button{width:52px;height:52px;font-size:24px;padding:0;background:#1d231cee}
 #fbar button[aria-pressed="true"]{background:var(--kaki);color:#1d231c}
 #fattr{position:absolute;right:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 72px);font-size:10px;color:#333;background:#fff9;padding:1px 4px;border-radius:3px}
 #card{z-index:30}
@@ -164,7 +166,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
     </div>
     <p class="warn">Symboles et ordres de bataille repris des figuratifs de l'EDG-T. Positions indicatives, à recaler avec les fascicules (menu ☰). Du 9 au 12 mai, chaque position porte son niveau de fiabilité.</p>
     <button id="go">Activer caméra et boussole</button>
-    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 29/09, 14 h 50</p>
+    <p class="warn" style="color:var(--dim);margin-top:10px">Version du 30/09, 9 h 30</p>
   </div>
 </div>
 
@@ -172,12 +174,13 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--kaki)}
   <canvas id="fmap"></canvas>
   <div id="fhead"><button id="fprev" aria-label="Phase précédente">◀</button><div id="fphase"></div><button id="fnext" aria-label="Phase suivante">▶</button></div>
   <div id="fattr">Fond © OpenTopoMap (CC-BY-SA) · © contributeurs OpenStreetMap · SRTM</div>
-  <div id="fbar"><button id="fzout" aria-label="Dézoomer">−</button><button id="fzin" aria-label="Zoomer">+</button><button id="fcenter" aria-pressed="true">Centrer</button><button id="fcap">Cap ↑</button><button id="ftopo">Topo actuelle</button><button id="fclose">Caméra</button></div>
+  <div id="fzoom"><button id="fzin" aria-label="Zoomer">+</button><button id="fzout" aria-label="Dézoomer">−</button></div>
+  <div id="fbar"><button id="fcenter" aria-pressed="true">Centrer</button><button id="fcap">Cap ↑</button><button id="ftopo">Topo actuelle</button><button id="falign">Aligner</button><button id="fclose">Caméra</button></div>
 </div>
 
 <div id="sheet">
   <button id="closeSheet">Fermer</button>
-  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 29/09, 14 h 50</p>
+  <p class="warn" style="color:var(--dim);margin:6px 0">Version du 30/09, 9 h 30</p>
   <h2>Ordre de bataille</h2>
   <div id="tabs"><button data-s="A" aria-pressed="true">Allemagne</button><button data-s="F" aria-pressed="false">France</button><button data-s="B" aria-pressed="false">Belgique</button></div>
   <div id="odb"></div>
@@ -608,22 +611,71 @@ const posSel=$("posMode");
 STATIONS.forEach(s=>{const o=document.createElement("option");o.value=s.id;o.textContent=s.n;posSel.appendChild(o);});
 posSel.addEventListener("change",()=>{ if(posSel.value!=="gps") $("where").textContent=STATIONS.find(s=>s.id===posSel.value).n; });
 const myPos=()=>posSel.value!=="gps"?STATIONS.find(s=>s.id===posSel.value):gps;
-function onTilt(e){ if(e.beta!=null&&e.gamma!=null){ const el=Math.asin(Math.max(-1,Math.min(1,-Math.cos(e.beta*rad)*Math.cos(e.gamma*rad))))/rad; pitch=pitch*0.8+el*0.2; tiltOK=true; } }
-let tiltOK=false;
+// ================= Orientation : matrice de rotation W3C, axe adapté à la vue, filtre adaptatif =================
+// Repère terrestre : x = est, y = nord, z = haut. R = Rz(alpha)·Rx(beta)·Ry(gamma) ; ses colonnes sont les axes de l'appareil.
+const DECL=2.5;          // déclinaison magnétique estimée (°, est) pour Sedan–Bouillon, 2026 : cap magnétique → cap vrai
+let tiltOK=false, headRaw=null, headNoise=0, lastT=0, dRate=0, fx1=0, fy1=0, lastWarn=0;
+window.flatShown=false;
+function axes(e){
+  const A=e.alpha*rad,B=e.beta*rad,G=e.gamma*rad, cA=Math.cos(A),sA=Math.sin(A),cB=Math.cos(B),sB=Math.sin(B),cG=Math.cos(G),sG=Math.sin(G);
+  return { X:[cA*cG-sA*sB*sG, sA*cG+cA*sB*sG, -cB*sG], Y:[-sA*cB, cA*cB, sB], Z:[cA*sG+sA*sB*cG, sA*sG-cA*sB*cG, cB*cG] };
+}
+function onTilt(e){ // inclinaison de la caméra (élévation), disponible même sans cap absolu
+  if(e.beta==null||e.gamma==null) return;
+  const el=Math.asin(Math.max(-1,Math.min(1,-Math.cos(e.beta*rad)*Math.cos(e.gamma*rad))))/rad;
+  pitch=pitch*0.7+el*0.3; tiltOK=true;
+}
+function rawHeading(e){
+  if(typeof e.webkitCompassHeading==="number") return (e.webkitCompassHeading+scrAngle()+360)%360; // iOS : haut de l'écran, magnétique
+  if(e.alpha==null||e.beta==null||e.gamma==null||!(e.absolute||e.type==="deviceorientationabsolute")) return null;
+  const {X,Y,Z}=axes(e), th=scrAngle()*rad;
+  const cam=[-Z[0],-Z[1]];                                                        // axe de la caméra arrière, projeté à l'horizontale
+  const up=[Math.cos(th)*Y[0]+Math.sin(th)*X[0], Math.cos(th)*Y[1]+Math.sin(th)*X[1]]; // haut de l'écran, projeté à l'horizontale
+  const nc=Math.hypot(...cam), nu=Math.hypot(...up), tilt=Math.acos(Math.max(-1,Math.min(1,Math.abs(Z[2]))))/rad;
+  // Carte à plat : toujours le haut de l'écran (comme une boussole de carte). Vue caméra : l'axe caméra, avec transition douce près de l'horizontale.
+  let w=window.flatShown?Math.max(0,Math.min(1,(tilt-65)/15)):Math.max(0,Math.min(1,(tilt-20)/25));
+  if(nc<1e-3) w=0; if(nu<1e-3) w=1;
+  const vx=w*(nc?cam[0]/nc:0)+(1-w)*(nu?up[0]/nu:0), vy=w*(nc?cam[1]/nc:0)+(1-w)*(nu?up[1]/nu:0);
+  if(Math.hypot(vx,vy)<1e-3) return null;
+  return (Math.atan2(vx,vy)/rad+360)%360;
+}
 function onOrient(e){
   onTilt(e);
-  let h=null;
-  if(typeof e.webkitCompassHeading==="number") h=(e.webkitCompassHeading+scrAngle()+360)%360;
-  else if(e.alpha!=null&&(e.absolute||e.type==="deviceorientationabsolute")){
-    const a=e.alpha*rad,b=(e.beta||0)*rad,g=(e.gamma||0)*rad;
-    const vx=-Math.cos(a)*Math.sin(g)-Math.sin(a)*Math.sin(b)*Math.cos(g), vy=-Math.sin(a)*Math.sin(g)+Math.cos(a)*Math.sin(b)*Math.cos(g);
-    h=Math.hypot(vx,vy)<.25?(360-e.alpha)%360:(Math.atan2(vx,vy)/rad+360)%360;
+  let h=rawHeading(e); if(h==null) return;
+  h=(h+DECL+360)%360;
+  // Filtre « 1 € » sur le vecteur cap : fort lissage à l'arrêt (supprime le tremblement), réactif quand on tourne vraiment
+  const now=performance.now(), dt=lastT?Math.min(0.2,Math.max(0.005,(now-lastT)/1000)):0.016; lastT=now;
+  const ux=Math.sin(h*rad), uy=Math.cos(h*rad);
+  if(headRaw==null){ fx1=ux; fy1=uy; headRaw=h; hasHead=true; }
+  else{
+    const prev=headRaw, diff=((h-prev+540)%360)-180;
+    const aD=1/(1+1/(2*Math.PI*1.0*dt)); dRate=dRate+(Math.abs(diff)/dt-dRate)*aD;          // vitesse de rotation lissée (°/s)
+    const fc=0.35+0.012*dRate, a=1/(1+1/(2*Math.PI*fc*dt));
+    fx1+= (ux-fx1)*a; fy1+=(uy-fy1)*a; headRaw=(Math.atan2(fx1,fy1)/rad+360)%360;
+    const res=((h-headRaw+540)%360)-180; headNoise=Math.sqrt(headNoise*headNoise*0.97+res*res*0.03); // bruit résiduel (°, écart-type)
   }
-  if(h==null) return;
-  h=(h+(+$("hcorr").value||0)+360)%360;
-  const k=hasHead?0.18:1;
-  hx=hx*(1-k)+Math.cos(h*rad)*k; hy=hy*(1-k)+Math.sin(h*rad)*k;
-  heading=(Math.atan2(hy,hx)/rad+360)%360; hasHead=true;
+  heading=(headRaw+(+$("hcorr").value||0)+360)%360;
+  if(headNoise>12&&dRate<20&&now-lastWarn>60000&&typeof ptoastG==="function"){ lastWarn=now; ptoastG("Boussole perturbée : éloignez-vous du véhicule et des masses métalliques, puis décrivez un 8 avec le téléphone."); }
+}
+// ================= GPS : filtre de Kalman simple (position lissée, sauts écartés) =================
+let kf=null;
+function onGPS(p){
+  const c=p.coords, acc=Math.max(3,c.accuracy||50), t=p.timestamp||Date.now();
+  if(!kf){ kf={lat0:c.latitude,lon0:c.longitude,e:0,n:0,P:acc*acc,t}; }
+  else{
+    if(acc>100&&Math.sqrt(kf.P)<50) return;                        // fix très imprécis : ignoré si on a mieux
+    const mE=111320*Math.cos(kf.lat0*rad), zE=(c.longitude-kf.lon0)*mE, zN=(c.latitude-kf.lat0)*111320;
+    const dt=Math.max(0,(t-kf.t)/1000), q=(c.speed>0.5)?2*c.speed+1:2.5; // incertitude de déplacement (m/s) : marche à pied par défaut
+    kf.P+=q*q*dt*dt; kf.t=t;
+    const inn=Math.hypot(zE-kf.e,zN-kf.n); if(inn>3*Math.sqrt(kf.P+acc*acc)) kf.P+=inn*inn; // vrai déplacement (véhicule) : rattrapage immédiat
+    const K=kf.P/(kf.P+acc*acc); kf.e+=K*(zE-kf.e); kf.n+=K*(zN-kf.n); kf.P*=(1-K);
+  }
+  const mE=111320*Math.cos(kf.lat0*rad);
+  gps={lat:kf.lat0+kf.n/111320, lon:kf.lon0+kf.e/mE}; gpsAcc=Math.sqrt(kf.P);
+  if(posSel.value==="gps"){
+    let near=null,best=1e9; STATIONS.forEach(s=>{const d=distBrg(gps,s).d; if(d<best){best=d;near=s;}});
+    $("where").textContent=best<300?"GPS, près de "+near.n:"GPS ±"+Math.round(gpsAcc)+" m";
+  }
 }
 async function start(){
   $("start").style.display="none";
@@ -634,13 +686,7 @@ async function start(){
   try{ $("cam").srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false}); }
   catch(e){ camErr=true; }
   if(navigator.geolocation){
-    navigator.geolocation.watchPosition(p=>{
-      gps={lat:p.coords.latitude,lon:p.coords.longitude}; gpsAcc=p.coords.accuracy;
-      if(posSel.value==="gps"){
-        let near=null,best=1e9; STATIONS.forEach(s=>{const d=distBrg(gps,s).d; if(d<best){best=d;near=s;}});
-        $("where").textContent=best<300?"GPS, près de "+near.n:"GPS ±"+Math.round(gpsAcc)+" m";
-      }
-    },()=>{ $("where").textContent="GPS refusé : choisissez un point dans la liste"; },{enableHighAccuracy:true,maximumAge:2000});
+    navigator.geolocation.watchPosition(onGPS,()=>{ $("where").textContent="GPS refusé : choisissez un point dans la liste"; },{enableHighAccuracy:true,maximumAge:0,timeout:30000});
   }
   if(typeof onStart==="function") onStart();
   requestAnimationFrame(loop);
@@ -654,7 +700,7 @@ const saveSet=()=>{ try{ localStorage.setItem("eht_bouillon_set",JSON.stringify(
 const showFov=()=>{ $("fov").value=curFov(); $("fovMode").textContent=isLand()?"paysage":"portrait"; };
 showFov(); addEventListener("resize",showFov);
 $("fov").addEventListener("change",()=>{ const v=Math.max(30,Math.min(100,+$("fov").value||55)); if(isLand())fovL=v; else fovP=v; showFov(); saveSet(); });
-$("hcorr").addEventListener("change",saveSet);
+$("hcorr").addEventListener("change",()=>{ saveSet(); if(headRaw!=null) heading=(headRaw+(+$("hcorr").value||0)+360)%360; });
 
 // ---------- Dates ----------
 const phPrev=document.createElement("button"),phNext=document.createElement("button"),phLab=document.createElement("button");
@@ -679,7 +725,7 @@ function loop(){
   const me=myPos(); hits=[];
   if(typeof flatTick==="function"&&flatTick()){ drawRadar(me); requestAnimationFrame(loop); return; }
   const hfov=curFov(), vfov=2*Math.atan(Math.tan(hfov/2*rad)*H/W)/rad;
-  $("headTxt").textContent=heading==null?"Cap : boussole indisponible":"Cap "+Math.round(heading)+"°";
+  $("headTxt").textContent=heading==null?"Cap : boussole indisponible":"Cap "+Math.round(heading)+"° ±"+Math.round(Math.max(3,headNoise*2))+"°";
   $("accTxt").textContent=posSel.value==="gps"&&gpsAcc?" · GPS ±"+Math.round(gpsAcc)+" m":"";
   const tgt=$("target");
   if(me&&heading!=null){
@@ -798,8 +844,8 @@ function showCard(u,m){
     b.onclick=ev=>{ev.stopPropagation(); target=on?null:m; card.style.display="none";}; row.appendChild(b);
     const rc=document.createElement("button"); rc.textContent="Je le vise : recaler la boussole";
     rc.onclick=ev=>{ev.stopPropagation(); const me=myPos(); if(!me||heading==null){alert("Position ou boussole indisponible.");return;}
-      const o=distBrg(me,m), c=Math.round((+$("hcorr").value||0)+(((o.b-heading+540)%360)-180));
-      $("hcorr").value=c; saveSet(); hasHead=false; card.style.display="none"; };
+      const o=distBrg(me,m), c=Math.round(((o.b-headRaw+540)%360)-180);
+      $("hcorr").value=c; saveSet(); heading=(headRaw+c+360)%360; card.style.display="none"; ptoastG("Boussole recalée ("+(c>0?"+":"")+c+"°)."); };
     row.appendChild(rc); card.appendChild(row); }
   card.style.display="block";
 }
@@ -879,7 +925,7 @@ const BASE={"riv":[[[49.5626,5.1069],[49.575,5.1],[49.5853,5.0934],[49.5935,5.08
 const RANK={"":0,I:1,II:2,III:3,X:4,XX:5,XXX:6,XXXX:7,XXXXX:8};
 const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}};
 const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v;}catch(e){return d;}};
-const ptoast=t=>{const e=$("ptoast");e.textContent=t;e.style.display="block";clearTimeout(ptoast.t);ptoast.t=setTimeout(()=>e.style.display="none",1800);};
+const ptoast=window.ptoastG=t=>{const e=$("ptoast");e.textContent=t;e.style.display="block";clearTimeout(ptoast.t);ptoast.t=setTimeout(()=>e.style.display="none",1800);};
 const dist2=(a,b)=>distBrg(a,b).d;
 
 // ---------- Filtres ----------
@@ -1044,7 +1090,13 @@ function drawFlat(){
   // moi : précision, cône de visée
   if(me){ const q=S(v,me.lat,me.lon);
     if(posSel.value==="gps"&&gpsAcc){ const mpp=156543.03*Math.cos(me.lat*rad)/Math.pow(2,FM.z); fx.fillStyle="#1f5fd633"; fx.beginPath(); fx.arc(q.x,q.y,Math.max(6,gpsAcc/mpp),0,7); fx.fill(); }
-    if(heading!=null){ const a=-Math.PI/2+(FM.capUp?0:heading*rad), hf=curFov()/2*rad; fx.fillStyle="#1f5fd644"; fx.beginPath(); fx.moveTo(q.x,q.y); fx.arc(q.x,q.y,90,a-hf,a+hf); fx.closePath(); fx.fill(); }
+    if(heading!=null){ const a=-Math.PI/2+(FM.capUp?0:heading*rad), unc=Math.max(4,Math.min(35,headNoise*2+3))*rad, L=Math.min(v.W,v.H)*0.42;
+      const gr=fx.createRadialGradient(q.x,q.y,0,q.x,q.y,L); gr.addColorStop(0,"#1f5fd680"); gr.addColorStop(1,"#1f5fd600");
+      fx.fillStyle=gr; fx.beginPath(); fx.moveTo(q.x,q.y); fx.arc(q.x,q.y,L,a-unc,a+unc); fx.closePath(); fx.fill();
+      fx.strokeStyle="#1f5fd6"; fx.lineWidth=2.5; fx.beginPath(); fx.moveTo(q.x,q.y); fx.lineTo(q.x+Math.cos(a)*L,q.y+Math.sin(a)*L); fx.stroke();
+      fx.font="700 13px 'Barlow Condensed',sans-serif"; fx.textAlign="center"; fx.lineWidth=3; fx.strokeStyle="#fffe";
+      const tx=q.x+Math.cos(a)*(L+14), ty=q.y+Math.sin(a)*(L+14)+4, lab=Math.round(heading)+"° ±"+Math.round(unc/rad)+"°";
+      fx.strokeText(lab,tx,ty); fx.fillStyle="#1f5fd6"; fx.fillText(lab,tx,ty); }
     fx.fillStyle="#fff"; fx.beginPath(); fx.arc(q.x,q.y,8,0,7); fx.fill(); fx.fillStyle="#1f5fd6"; fx.beginPath(); fx.arc(q.x,q.y,5.5,0,7); fx.fill(); }
   // nord, échelle
   const nr=v.rot; fx.save(); fx.translate(v.W-34,120); fx.rotate(nr); fx.fillStyle="#1d231c"; fx.beginPath(); fx.moveTo(0,-16); fx.lineTo(8,10); fx.lineTo(0,5); fx.lineTo(-8,10); fx.closePath(); fx.fill();
@@ -1054,7 +1106,7 @@ function drawFlat(){
   $("fphase").textContent=(phase+1)+"/"+PHASES.length+" · "+PHASES[phase].lab+" : "+PHASES[phase].t;
   $("fcap").textContent=FM.capUp?"Cap ↑":"Nord ↑"; $("ftopo").textContent=BG[FM.bg].lab; $("fattr").textContent=BG[FM.bg].attr; $("fcenter").setAttribute("aria-pressed",FM.follow);
 }
-function showFlat(on){ if(FM.shown===on) return; FM.shown=on; $("flat").style.display=on?"block":"none"; $("tMap").setAttribute("aria-pressed",on); if(on) $("card").style.display="none"; }
+function showFlat(on){ if(FM.shown===on) return; FM.shown=on; window.flatShown=on; $("flat").style.display=on?"block":"none"; $("tMap").setAttribute("aria-pressed",on); if(on) $("card").style.display="none"; }
 window.flatTick=()=>{ const now=Date.now();
   if(!FM.manual&&tiltOK){ // bascule automatique : téléphone à plat → carte ; relevé → caméra
     if(pitch<-55){ FM.highT=0; if(!FM.lowT) FM.lowT=now; if(!FM.suppress&&now-FM.lowT>500) showFlat(true); }
@@ -1063,6 +1115,9 @@ window.flatTick=()=>{ const now=Date.now();
 $("tMap").onclick=()=>{ if(FM.shown){ FM.manual=false; FM.suppress=true; showFlat(false); } else { FM.manual=true; showFlat(true); } };
 $("fclose").onclick=()=>{ FM.manual=false; FM.suppress=true; showFlat(false); };
 $("fcenter").onclick=()=>{ FM.follow=true; };
+let aligning=false;
+$("falign").onclick=()=>{ aligning=!aligning; $("falign").setAttribute("aria-pressed",aligning);
+  if(aligning) ptoast("Pointez le haut du téléphone vers un point que vous voyez (clocher, carrefour), puis touchez ce point sur la carte."); };
 $("fcap").onclick=()=>{ FM.capUp=!FM.capUp; store("eht_fcap",FM.capUp); };
 $("ftopo").onclick=()=>{ FM.bg=BGORDER[(BGORDER.indexOf(FM.bg)+1)%BGORDER.length]; store("eht_fbg",FM.bg); ptoast("Fond : "+BG[FM.bg].lab); };
 $("fzin").onclick=()=>{ FM.z=Math.min(17,FM.z+1); store("eht_fz",FM.z); };
@@ -1079,6 +1134,13 @@ fc.addEventListener("pointermove",e=>{ if(!ptr.has(e.pointerId)||!g) return; con
   const v=view(), co=Math.cos(v.rot), si=Math.sin(v.rot), wx=dx*co+dy*si, wy=-dx*si+dy*co;
   const c=merc(FM.center.lat,FM.center.lon,FM.z); FM.center=unmerc(c.x-wx,c.y-wy,FM.z); FM.follow=false; });
 fc.addEventListener("pointerup",e=>{ ptr.delete(e.pointerId); if(ptr.size) return; store("eht_fz",FM.z);
+  if(g&&!g.moved&&aligning){ const r=fc.getBoundingClientRect(),v=view(),X=e.clientX-r.left-v.ox,Y=e.clientY-r.top-v.oy,co=Math.cos(v.rot),si=Math.sin(v.rot);
+    const c=merc(FM.center.lat,FM.center.lon,FM.z), P=unmerc(c.x+X*co+Y*si,c.y-X*si+Y*co,FM.z), me=myPos();
+    aligning=false; $("falign").setAttribute("aria-pressed",false); g=null;
+    if(!me||headRaw==null){ ptoast("Position ou boussole indisponible."); return; }
+    const o=distBrg(me,P); if(o.d<80){ ptoast("Point trop proche : choisissez un repère à plus de 100 m."); return; }
+    const corr=Math.round(((o.b-headRaw+540)%360)-180); $("hcorr").value=corr; saveSet(); heading=(headRaw+corr+360)%360;
+    ptoast("Boussole alignée ("+(corr>0?"+":"")+corr+"°) sur un point à "+fmtD(o.d)+"."); return; }
   if(g&&!g.moved){ const r=fc.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
     const h=fhits.slice().reverse().find(k=>Math.hypot(k.x-x,k.y-y)<k.r+8); if(h) showCard(h.m.u,h.m); else $("card").style.display="none"; }
   g=null; });
